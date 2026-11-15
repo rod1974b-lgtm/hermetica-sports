@@ -68,7 +68,8 @@ export function PulseTab({
 
   // 365-Day Auto-Ranked Year-Round Pulse Leaderboard
   const rankedPulseTeams = useMemo(() => {
-    return getSortedYearRoundPulse(filter, favs);
+    const list = getSortedYearRoundPulse(favs, filter === "favs" ? "all" : filter);
+    return filter === "favs" ? list.filter((p) => favs.includes(p.teamId)) : list;
   }, [filter, favs]);
 
   const toggleExpand = (teamId: string) => {
@@ -298,14 +299,14 @@ export function PulseTab({
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-base sm:text-lg">
-                          {lang === "th" && team?.th ? team.th : item.name}
+                          {lang === "th" && team?.th ? team.th : team?.name ?? item.teamId}
                         </span>
                         <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground uppercase">
-                          {item.league}
+                          {team?.league}
                         </span>
                       </div>
                       <div className="text-xs text-muted-foreground font-medium">
-                        {item.phaseBadge[lang]}
+                        {item.phase[lang]}
                       </div>
                     </div>
                   </div>
@@ -314,7 +315,7 @@ export function PulseTab({
                     <div className="text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         <span className="font-display text-2xl sm:text-3xl font-bold text-primary">
-                          {item.score}
+                          {item.pulseScore}
                         </span>
                         <span className="text-xs text-muted-foreground font-bold">/100</span>
                       </div>
@@ -338,15 +339,15 @@ export function PulseTab({
                 {/* Pulse Visual Bar */}
                 <div className="space-y-1">
                   <div className="flex justify-between text-[11px] text-muted-foreground">
-                    <span>{item.metric[lang]}</span>
+                    <span>{item.focusPill[lang]}</span>
                     <span className="font-semibold text-primary">
-                      Pulse Intensity {item.score}%
+                      Pulse Intensity {item.pulseScore}%
                     </span>
                   </div>
                   <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
                     <div
                       className="h-full rounded-full transition-all duration-700 bg-gradient-to-r from-primary/80 to-primary"
-                      style={{ width: `${item.score}%` }}
+                      style={{ width: `${item.pulseScore}%` }}
                     />
                   </div>
                 </div>
@@ -355,8 +356,8 @@ export function PulseTab({
                 <div className="pt-2 border-t border-border/60">
                   <p className="text-sm leading-relaxed text-foreground/90">
                     {isExpanded
-                      ? item.summary[lang]
-                      : `${item.summary[lang].slice(0, 160)}...`}
+                      ? item.narrative[lang]
+                      : `${item.narrative[lang].slice(0, 160)}...`}
                   </p>
 
                   <button
@@ -383,10 +384,10 @@ export function PulseTab({
                     {item.catalysts.map((cat, cIdx) => (
                       <div key={cIdx} className="space-y-0.5">
                         <div className="text-[10px] font-bold text-muted-foreground uppercase">
-                          {cat.label[lang]}
+                          {cat.type.replace("_", " ")}
                         </div>
                         <div className="font-medium text-foreground">
-                          {cat.value[lang]}
+                          {cat.headline[lang]}
                         </div>
                       </div>
                     ))}

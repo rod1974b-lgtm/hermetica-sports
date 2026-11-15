@@ -144,7 +144,7 @@ export function HermitcaGamecast({
   // Determine current active game data
   const currentGame = useMemo(() => {
     if (propGame) return propGame;
-    const demo = DEMO_GAMES[selectedDemoKey] || DEMO_GAMES.nfl;
+    const demo = (DEMO_GAMES[selectedDemoKey] || DEMO_GAMES["nfl"])!;
     return {
       id: demo.id || "demo-game",
       home: demo.home || "vik",
@@ -1054,7 +1054,7 @@ function NBAVisualizer({
   setIsPipOpen: React.Dispatch<React.SetStateAction<boolean>>;
   selectedPin: string | null;
   setSelectedPin: (p: string | null) => void;
-  onSelectGame?: (g: Game) => void;
+  onSelectGame?: ((g: Game) => void) | undefined;
   lang: Lang;
 }) {
   return (

@@ -886,7 +886,7 @@ export default function App() {
       {selectedGame && (
         <HermitcaGamecast
           game={selectedGame}
-          onClose={() => setSelectedGame(null)}
+          onBack={() => setSelectedGame(null)}
           onSelectGame={setSelectedGame}
           lang={lang}
         />
