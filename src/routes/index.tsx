@@ -1,18 +1,11 @@
-// =========================================================================
-// PART 1 OF 5: Lines 1 - 347 of src/routes/index.tsx
-// =========================================================================
-
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import {
-  Hub,
   Lang,
   Team,
   Game,
-  SPORTS_THEMES,
   TEAMS,
-  LEAGUES,
-  MN_IDS,
+  LEAGUES_DATA,
   T,
   teamById,
   fmtTime,
@@ -21,2226 +14,929 @@ import {
   fetchLiveESPNLeague,
   ESPN_LEAGUES,
   fetchDualWeather,
-  UPCOMING_HUB_FIXTURES,
 } from "@/lib/live-sports-api";
 import { HermitcaGamecast } from "@/components/HermitcaGamecast";
 import {
   Radio,
   Star,
-  Compass,
-  Trophy,
-  Sparkles,
-  Flame,
   Search,
-  Calendar,
-  Share2,
+  Clock,
   TrendingUp,
   RotateCcw,
-  Clock,
-  MapPin,
-  ChevronRight,
+  Sparkles,
+  ChevronDown,
+  ChevronUp,
   Shield,
   Activity,
-  Award,
+  Layers,
   Zap,
-  Globe,
-  CheckCircle2,
-  AlertCircle,
-  ExternalLink,
-  Target,
-  BarChart3,
-  Percent,
+  Info,
+  Calendar,
+  AlertTriangle,
+  Award,
 } from "lucide-react";
-import { toast } from "sonner";
 
 export const Route = createFileRoute("/")({
+  component: HermeticaSportsApp,
   head: () => ({
-    title: "Hermetica Sports OS | Ratchaburi & Minnesota Twin Cities Live Sports",
     meta: [
+      { title: "Hermetica Sports OS | Global Sports Command Center" },
       {
         name: "description",
         content:
-          "Bilingual real-time Sports OS tracking Ratchaburi FC, all 7 Minnesota professional teams (Vikings, Timberwolves, Twins, Wild, Lynx, Frost, MNUFC), and global leagues with live scores, momentum radar, and year-round team pulse.",
+          "Real-time scores, multi-model Pulse analytics, live gamecast and season outlook for NBA, NFL, MLB, NHL, EPL, Thai League, and world sports.",
       },
-      {
-        property: "og:title",
-        content: "Hermetica Sports OS | Global & Hub Sports Command Center",
-      },
+      { property: "og:title", content: "Hermetica Sports OS" },
       {
         property: "og:description",
         content:
-          "Real-time dual-timezone sports tracking for Dragon Solar Park, Minnesota Twin Cities, and 14 international leagues.",
+          "Live scoreboards, Sharp + BPI/FPI Pulse engine, Gamecast visuals and season trajectories.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: App,
 });
 
-// =========================================================================
-// DATA MODELS & SEASON OUTLOOK
-// =========================================================================
+type AppTab = "my-teams" | "all-teams" | "live";
 
-export type AppTab =
-  | "live"
-  | "pulse"
-  | "my"
-  | "seasons"
-  | "explore"
-  | "leagues"
-  | "fantasy";
-
-export type SeasonPhase =
-  | "preseason"
-  | "regular"
-  | "playoffs"
-  | "championship"
-  | "offseason";
-
-export interface KeyDate {
-  date: string;
-  label: { en: string; th: string };
-  phase: SeasonPhase;
-  highlight?: boolean;
+interface PulseBreakdown {
+  sharp: number; // 25%
+  bpiFpi: number; // 15%
+  pff: number; // 10%
+  fiveThirtyEight: number; // 10%
+  optaFangraphs: number; // 10%
+  market: number; // 15%
+  form: number; // 10%
+  context: number; // 5%
+  total: number;
+  delta: number;
 }
 
-export interface SeasonOutlook {
-  teamId: string;
-  seasonYear: string;
-  currentPhase: SeasonPhase;
-  phaseLabel: { en: string; th: string };
-  summary: { en: string; th: string };
-  keyDates: KeyDate[];
-  playoffOdds?: string;
-  championshipOdds?: string;
-  projectedRecord?: string;
-  milestones?: { en: string; th: string }[];
+interface TeamOutlook {
+  tier: "Title Favorites" | "Rising Contenders" | "Play-In Middle" | "Zone of Shame / Relegation";
+  tierColor: string;
+  winProjection: string;
+  playoffPct: number;
+  championshipPct: number;
+  injuryImpact: "Low" | "Moderate" | "Critical";
+  injuryDetails: string;
+  next5: string[];
+  deepStats: { label: string; value: string }[];
+  marketConsensus: string;
+  relegationRisk?: string;
 }
 
-export const SEASON_OUTLOOKS: Record<string, SeasonOutlook> = {
+const OUTLOOK_SEED: Record<string, TeamOutlook> = {
   vik: {
-    teamId: "vik",
-    seasonYear: "2026-27",
-    currentPhase: "regular",
-    phaseLabel: { en: "Regular Season", th: "ฤดูกาลปกติ" },
-    summary: {
-      en: "Following a scorching 2-0 kickoff fueled by Brian Flores' aggressive blitz scheme, the Vikings aim for the NFC North crown. With high-efficiency quarterback play and Justin Jefferson stretching coverages, Minnesota is primed for a deep January playoff run.",
-      th: "ออกสตาร์ทสุดร้อนแรงด้วยสถิติ 2-0 จากแผนเกมรับบุกแหลกของ ไบรอัน ฟลอเรส มินนิโซตา ไวกิ้งส์ ตั้งเป้าล่าแชมป์กลุ่ม NFC North การขับเคลื่อนเกมรุกที่มีประสิทธิภาพร่วมกับ จัสติน เจฟเฟอร์สัน พร้อมพาทีมลุยศึกเพลย์ออฟเดือนมกราคม",
-    },
-    projectedRecord: "11-6",
-    playoffOdds: "82%",
-    championshipOdds: "+1800",
-    keyDates: [
-      {
-        date: "2026-08-08",
-        label: { en: "Training Camp & Preseason Opener", th: "เปิดแคมป์ฝึกซ้อม & พรีซีซัน" },
-        phase: "preseason",
-      },
-      {
-        date: "2026-09-10",
-        label: { en: "NFL Kickoff Weekend", th: "เปิดฤดูกาลปกติ NFL" },
-        phase: "regular",
-        highlight: true,
-      },
-      {
-        date: "2026-09-28",
-        label: { en: "Dublin Classic @ Croke Park vs Steelers", th: "ดับลิน คลาสสิก @ โครก พาร์ก พบ สตีลเลอร์ส" },
-        phase: "regular",
-        highlight: true,
-      },
-      {
-        date: "2027-01-10",
-        label: { en: "Regular Season Finale", th: "นัดปิดฤดูกาลปกติ" },
-        phase: "regular",
-      },
-      {
-        date: "2027-01-16",
-        label: { en: "NFL Wild Card Weekend", th: "รอบไวลด์การ์ด NFL" },
-        phase: "playoffs",
-      },
-      {
-        date: "2027-02-14",
-        label: { en: "Super Bowl LXI", th: "ซูเปอร์โบวล์ ครั้งที่ 61" },
-        phase: "championship",
-        highlight: true,
-      },
-      {
-        date: "2027-03-15",
-        label: { en: "NFL Free Agency & Draft Prep", th: "ตลาดฟรีเอเยนต์ & เตรียมการดราฟต์" },
-        phase: "offseason",
-      },
+    tier: "Rising Contenders",
+    tierColor: "bg-purple-500/20 text-purple-400 border-purple-500/30",
+    winProjection: "11.2 Wins (Over 10.5)",
+    playoffPct: 78,
+    championshipPct: 9.4,
+    injuryImpact: "Moderate",
+    injuryDetails: "QB room healthy, DB depth tested",
+    next5: ["@ Steelers", "vs Packers", "@ Lions", "vs Bears", "@ Seahawks"],
+    deepStats: [
+      { label: "EPA / Play", value: "+0.14 (4th)" },
+      { label: "Pressure %", value: "39.2% (1st)" },
+      { label: "Success Rate", value: "48.1% (8th)" },
+      { label: "DVOA Rank", value: "#3 Overall" },
     ],
-    milestones: [
-      { en: "Top-5 NFL Scoring Defense ranking", th: "อันดับท็อป 5 เกมรับเสียแต้มน้อยที่สุดใน NFL" },
-      { en: "Over 1,400 receiving yards projected for WR1", th: "เป้าหมายรับบอลทะลุ 1,400 หลาของปีกเบอร์ 1" },
-    ],
+    marketConsensus: "Sharp money siding with defense; totals drifting under.",
   },
   wolves: {
-    teamId: "wolves",
-    seasonYear: "2026-27",
-    currentPhase: "preseason",
-    phaseLabel: { en: "Preseason / Training Camp", th: "พรีซีซัน & เทรนนิ่งแคมป์" },
-    summary: {
-      en: "Anthony Edwards steps into MVP contention surrounded by Rudy Gobert's interior deterrence and an upgraded perimeter arsenal. After deep Western Conference Finals runs, the target is the NBA Finals stage.",
-      th: "แอนโทนี เอ็ดเวิร์ดส์ ก้าวสู่แคนดิเดต MVP เต็มตัว ผนึกกำลังกับเกมป้องกันวงในของ รูดี โกแบร์ หลังเข้าชิงแชมป์สายตะวันตก เป้าหมายเดียวคือการคว้าตั๋วเข้าสู่ NBA ไฟนอลส์",
-    },
-    projectedRecord: "53-29",
-    playoffOdds: "91%",
-    championshipOdds: "+950",
-    keyDates: [
-      {
-        date: "2026-10-02",
-        label: { en: "NBA Preseason Tip-off @ Target Center", th: "เปิดศึกพรีซีซัน @ ทาร์เก็ต เซ็นเตอร์" },
-        phase: "preseason",
-      },
-      {
-        date: "2026-10-22",
-        label: { en: "Regular Season Home Opener", th: "เปิดฤดูกาลปกติเกมแรกในบ้าน" },
-        phase: "regular",
-        highlight: true,
-      },
-      {
-        date: "2026-12-15",
-        label: { en: "NBA Emirates Cup Knockouts", th: "เอมิเรตส์ เอ็นบีเอ คัพ รอบน็อกเอาต์" },
-        phase: "regular",
-      },
-      {
-        date: "2027-04-18",
-        label: { en: "NBA Playoffs Round 1", th: "เปิดศึก NBA เพลย์ออฟ รอบแรก" },
-        phase: "playoffs",
-        highlight: true,
-      },
-      {
-        date: "2027-06-03",
-        label: { en: "NBA Finals Game 1", th: "NBA ไฟนอลส์ นัดแรก" },
-        phase: "championship",
-        highlight: true,
-      },
-      {
-        date: "2027-06-25",
-        label: { en: "NBA Draft & Free Agency Window", th: "งานดราฟต์ผู้เล่น & ตลาดฟรีเอเยนต์" },
-        phase: "offseason",
-      },
+    tier: "Title Favorites",
+    tierColor: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+    winProjection: "54.5 Wins",
+    playoffPct: 96,
+    championshipPct: 18.2,
+    injuryImpact: "Low",
+    injuryDetails: "Primary rotation 100% active",
+    next5: ["vs Nuggets", "@ Thunder", "vs Mavericks", "@ Suns", "vs Lakers"],
+    deepStats: [
+      { label: "Net Rating", value: "+7.8 (2nd)" },
+      { label: "Def Rating", value: "107.2 (1st)" },
+      { label: "True Shooting", value: "59.4% (5th)" },
+      { label: "Pace", value: "98.4 (19th)" },
     ],
-    milestones: [
-      { en: "Defensive Rating ranking in league top-3", th: "เรตติ้งเกมรับติด 3 อันดับแรกของลีก" },
-      { en: "Home court advantage through at least Round 2", th: "คว้าสิทธิ์เจ้าบ้านอย่างน้อยจนถึงรอบสอง" },
-    ],
+    marketConsensus: "Top-2 Western Conference seed implied by lines.",
   },
   wild: {
-    teamId: "wild",
-    seasonYear: "2026-27",
-    currentPhase: "regular",
-    phaseLabel: { en: "Regular Season", th: "ฤดูกาลปกติ" },
-    summary: {
-      en: "Kaprizov and Boldy anchor one of the NHL's most dynamic scoring tandems. Freed from past buyout salary constraints, the Wild have deepened their blueline and enter the Central Division arms race as a true Stanley Cup dark horse.",
-      th: "คิริลล์ คาปริซอฟ และ แมตต์ โบลดี นำทัพคู่แนวรุกอันตรายที่สุดใน NHL การพ้นเพดานค่าเหนื่อยช่วยเสริมแนวรับแกร่ง พร้อมท้าชิงแชมป์ดิวิชันเซ็นทรัลและลุ้นถ้วยสแตนลีย์คัพ",
-    },
-    projectedRecord: "48-25-9",
-    playoffOdds: "79%",
-    championshipOdds: "+2200",
-    keyDates: [
-      {
-        date: "2026-09-21",
-        label: { en: "NHL Preseason Training Camp", th: "พรีซีซัน & เทรนนิ่งแคมป์ฮอกกี้" },
-        phase: "preseason",
-      },
-      {
-        date: "2026-10-10",
-        label: { en: "Home Opener vs Chicago Blackhawks", th: "เปิดบ้านพบ ชิคาโก แบล็กฮอว์กส์" },
-        phase: "regular",
-        highlight: true,
-      },
-      {
-        date: "2027-01-01",
-        label: { en: "NHL Winter Classic Showcase", th: "ศึกกลางแจ้ง วินเทอร์ คลาสสิก" },
-        phase: "regular",
-      },
-      {
-        date: "2027-04-14",
-        label: { en: "Regular Season Conclusion", th: "ปิดฤดูกาลปกติ NHL" },
-        phase: "regular",
-      },
-      {
-        date: "2027-04-19",
-        label: { en: "Stanley Cup Playoffs Begin", th: "เปิดศึกสแตนลีย์ คัพ เพลย์ออฟ" },
-        phase: "playoffs",
-        highlight: true,
-      },
-      {
-        date: "2027-06-10",
-        label: { en: "Stanley Cup Finals", th: "สแตนลีย์ คัพ รอบชิงชนะเลิศ" },
-        phase: "championship",
-        highlight: true,
-      },
+    tier: "Play-In Middle",
+    tierColor: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+    winProjection: "94.0 Points",
+    playoffPct: 58,
+    championshipPct: 4.1,
+    injuryImpact: "Moderate",
+    injuryDetails: "Top-6 winger questionable for weekend",
+    next5: ["vs Avalanche", "@ Stars", "vs Jets", "@ Blues", "vs Predators"],
+    deepStats: [
+      { label: "xGF %", value: "52.4% (11th)" },
+      { label: "Save % (5v5)", value: ".921 (8th)" },
+      { label: "PP %", value: "23.8% (9th)" },
+      { label: "PK %", value: "81.4% (12th)" },
     ],
+    marketConsensus: "Bubble wildcard candidate; high variance in goal.",
   },
   twins: {
-    teamId: "twins",
-    seasonYear: "2026",
-    currentPhase: "offseason",
-    phaseLabel: { en: "Offseason & Hot Stove", th: "ช่วงปิดฤดูกาล & ตลาดซื้อขาย" },
-    summary: {
-      en: "After a season testing young talent like Emmanuel Rodriguez and young bullpen arms, the Twins pivot toward pitching acquisitions and roster re-tooling ahead of Fort Myers Spring Training.",
-      th: "หลังเปิดโอกาสให้ดาวรุ่งอย่าง เอ็มมานูเอล โรดริเกซ ฉายแวว มินนิโซตา ทวินส์ เดินหน้าเสริมพิชเชอร์และปรับโครงสร้างทีมเพื่อเตรียมความพร้อมสู่สปริงเทรนนิ่งที่ฟอร์ตไมเออร์ส",
-    },
-    projectedRecord: "84-78",
-    playoffOdds: "48%",
-    championshipOdds: "+4500",
-    keyDates: [
-      {
-        date: "2026-11-05",
-        label: { en: "MLB Free Agency & Trade Meetings", th: "เปิดตลาดฟรีเอเยนต์ & ประชุมเทรดผู้เล่น" },
-        phase: "offseason",
-      },
-      {
-        date: "2027-02-14",
-        label: { en: "Pitchers & Catchers Report (Fort Myers)", th: "พิชเชอร์ & แคชเชอร์ รายงานตัวสปริงเทรนนิ่ง" },
-        phase: "preseason",
-        highlight: true,
-      },
-      {
-        date: "2027-03-27",
-        label: { en: "MLB Opening Day 2027", th: "วันเปิดฤดูกาลเบสบอล MLB 2027" },
-        phase: "regular",
-        highlight: true,
-      },
-      {
-        date: "2027-10-01",
-        label: { en: "Postseason AL Wild Card Series", th: "รอบไวลด์การ์ด อเมริกันลีก" },
-        phase: "playoffs",
-      },
+    tier: "Play-In Middle",
+    tierColor: "bg-sky-500/20 text-sky-400 border-sky-500/30",
+    winProjection: "83.5 Wins",
+    playoffPct: 44,
+    championshipPct: 2.8,
+    injuryImpact: "Critical",
+    injuryDetails: "Rotation aces managing workload",
+    next5: ["vs Guardians", "vs White Sox", "@ Tigers", "@ Royals", "vs Yankees"],
+    deepStats: [
+      { label: "wRC+", value: "106 (9th)" },
+      { label: "FIP", value: "3.88 (10th)" },
+      { label: "Bullpen ERA", value: "3.72 (12th)" },
+      { label: "Barrel %", value: "8.9% (7th)" },
     ],
-  },
-  lynx: {
-    teamId: "lynx",
-    seasonYear: "2026",
-    currentPhase: "championship",
-    phaseLabel: { en: "WNBA Finals / Title Chase", th: "รอบชิงชนะเลิศ WNBA" },
-    summary: {
-      en: "Led by Napheesa Collier's historic MVP-caliber season and Courtney Williams' playmaking, the Lynx sit on the precipice of securing franchise championship banner #5.",
-      th: "นำโดย นาฟีซา คอลเลียร์ ที่ระเบิดฟอร์มระดับ MVP มินนิโซตา ลิงซ์ ยืนหยัดอยู่บนเส้นทางล่าแชมป์ WNBA สมัยที่ 5 ของประวัติศาสตร์สโมสร",
-    },
-    projectedRecord: "33-7",
-    playoffOdds: "100%",
-    championshipOdds: "+140",
-    keyDates: [
-      {
-        date: "2026-05-15",
-        label: { en: "WNBA Season Tip-Off", th: "เปิดฉากฤดูกาล WNBA" },
-        phase: "regular",
-      },
-      {
-        date: "2026-09-20",
-        label: { en: "WNBA Playoffs Round 1", th: "เพลย์ออฟ รอบแรก" },
-        phase: "playoffs",
-      },
-      {
-        date: "2026-10-10",
-        label: { en: "WNBA Finals Game 1", th: "WNBA ไฟนอลส์ นัดแรก" },
-        phase: "championship",
-        highlight: true,
-      },
-      {
-        date: "2026-10-22",
-        label: { en: "WNBA Trophy Presentation & Parade", th: "พิธีมอบแชมป์และขบวนพาเหรด" },
-        phase: "championship",
-      },
-    ],
-  },
-  frost: {
-    teamId: "frost",
-    seasonYear: "2026-27",
-    currentPhase: "preseason",
-    phaseLabel: { en: "Preseason / Defense of the Cup", th: "เตรียมป้องกันแชมป์วอลเตอร์ คัพ" },
-    summary: {
-      en: "The back-to-back Walter Cup Champions return with Taylor Heise, Kendall Coyne Schofield, and Nicole Hensley. The Frost represent the premier dynasty in professional women's ice hockey.",
-      th: "แชมป์วอลเตอร์ คัพ 2 สมัยซ้อน กลับมาพร้อม เทย์เลอร์ ไฮซี และ เคนดัลล์ คอยน์ ทัพฟรอสต์ยืนหยัดในฐานะทีมเต็งหนึ่งแห่งวงการฮอกกี้น้ำแข็งหญิงอาชีพโลก",
-    },
-    projectedRecord: "20-6-4",
-    playoffOdds: "94%",
-    championshipOdds: "+160",
-    keyDates: [
-      {
-        date: "2026-11-15",
-        label: { en: "PWHL Training Camps Open", th: "เปิดแคมป์ฝึกซ้อม PWHL" },
-        phase: "preseason",
-      },
-      {
-        date: "2026-12-01",
-        label: { en: "Championship Banner Raising @ Xcel", th: "พิธีแขวนแบนเนอร์แชมป์ @ เอ็กเซล เซ็นเตอร์" },
-        phase: "regular",
-        highlight: true,
-      },
-      {
-        date: "2027-05-02",
-        label: { en: "Walter Cup Playoffs Commence", th: "เปิดศึกวอลเตอร์ คัพ เพลย์ออฟ" },
-        phase: "playoffs",
-        highlight: true,
-      },
-    ],
-  },
-  mnufc: {
-    teamId: "mnufc",
-    seasonYear: "2026",
-    currentPhase: "regular",
-    phaseLabel: { en: "MLS Decision Day Push", th: "โค้งสุดท้ายลุ้นตั๋วเพลย์ออฟ MLS" },
-    summary: {
-      en: "The Loons are battling down to the wire for Audi MLS Cup Playoff seeding. High-pressing transitions and set-piece mastery under the Allianz Field lights are key to their knockout ambitions.",
-      th: "เดอะ ลูนส์ กำลังสู้สุดชีวิตเพื่อคว้าโควตาเพลย์ออฟ เมเจอร์ลีก ซอกเกอร์ สไตล์การเพรสซิ่งสูงและการเล่นลูกตั้งเตะที่ อลิอันซ์ ฟิลด์ คือกุญแจสำคัญสู่รอบน็อกเอาต์",
-    },
-    projectedRecord: "13-11-10",
-    playoffOdds: "64%",
-    championshipOdds: "+3300",
-    keyDates: [
-      {
-        date: "2026-02-28",
-        label: { en: "MLS Season Opener", th: "เปิดฤดูกาล MLS" },
-        phase: "regular",
-      },
-      {
-        date: "2026-10-18",
-        label: { en: "MLS Decision Day Finale", th: "ศึกตัดสินวันสุดท้าย MLS Decision Day" },
-        phase: "regular",
-        highlight: true,
-      },
-      {
-        date: "2026-10-25",
-        label: { en: "Audi MLS Cup Playoffs Round 1", th: "รอบแรก อาวดี้ เอ็มแอลเอส คัพ เพลย์ออฟ" },
-        phase: "playoffs",
-      },
-    ],
+    marketConsensus: "AL Central coin-flip; reliant on pitching health.",
   },
   rbfc: {
-    teamId: "rbfc",
-    seasonYear: "2026-27",
-    currentPhase: "regular",
-    phaseLabel: { en: "Thai League 1 Campaign", th: "ศึกรีโว่ ไทยลีก 1" },
-    summary: {
-      en: "The Dragons have turned Dragon Solar Park into an impenetrable fortress in Thai League 1. Backed by explosive counter-attacking football and fierce local pride, Ratchaburi is hunting for top-3 honors and an AFC Champions League berth.",
-      th: "ราชันมังกร เปลี่ยนสนาม ดราก้อน โซลาร์ พาร์ค ให้เป็นปราการไร้พ่ายในไทยลีก 1 ด้วยแท็กติกเกมสวนกลับที่เฉียบคมและพลังใจจากแฟนบอลท้องถิ่น ราชบุรี มุ่งมั่นจบอันดับท็อป 3 เพื่อคว้าตั๋วลุยศึกสโมสรเอเชีย AFC Champions League",
-    },
-    projectedRecord: "W17 D8 L5",
-    playoffOdds: "Top 3: 72%",
-    championshipOdds: "+600",
-    keyDates: [
-      {
-        date: "2026-08-14",
-        label: { en: "Thai League 1 Season Opener", th: "เปิดฉาก รีโว่ ไทยลีก 1" },
-        phase: "regular",
-      },
-      {
-        date: "2026-11-01",
-        label: { en: "Derby vs Buriram United @ Home", th: "บิ๊กแมตช์พบ บุรีรัมย์ ยูไนเต็ด ในบ้าน" },
-        phase: "regular",
-        highlight: true,
-      },
-      {
-        date: "2027-02-20",
-        label: { en: "FA Cup Quarter-Finals", th: "ช้าง เอฟเอ คัพ รอบ 8 ทีมสุดท้าย" },
-        phase: "playoffs",
-      },
-      {
-        date: "2027-05-15",
-        label: { en: "Thai League 1 Final Matchday", th: "นัดปิดฤดูกาล ไทยลีก 1" },
-        phase: "regular",
-        highlight: true,
-      },
+    tier: "Rising Contenders",
+    tierColor: "bg-orange-500/20 text-orange-400 border-orange-500/30",
+    winProjection: "Top 4 Finish (52 Pts)",
+    playoffPct: 72,
+    championshipPct: 12.0,
+    injuryImpact: "Low",
+    injuryDetails: "Full squad available at Dragon Solar Park",
+    next5: ["vs Buriram", "@ Bangkok Utd", "vs Port FC", "@ Muangthong", "vs BG Pathum"],
+    deepStats: [
+      { label: "xG Difference", value: "+0.62 / 90" },
+      { label: "Possession", value: "54.8%" },
+      { label: "PPDA", value: "9.2 (High Press)" },
+      { label: "Clean Sheets", value: "7 in 14" },
     ],
+    marketConsensus: "Dominant home record; top defensive unit in Thai League 1.",
+  },
+  ars: {
+    tier: "Title Favorites",
+    tierColor: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+    winProjection: "88.0 Points",
+    playoffPct: 99,
+    championshipPct: 41.5,
+    injuryImpact: "Low",
+    injuryDetails: "Key spine fully fit",
+    next5: ["vs Man City", "@ Liverpool", "vs Chelsea", "@ Newcastle", "vs Spurs"],
+    deepStats: [
+      { label: "xG / 90", value: "2.14 (1st)" },
+      { label: "xGA / 90", value: "0.78 (1st)" },
+      { label: "Set Piece xG", value: "12.4 (1st)" },
+      { label: "Field Tilt", value: "68.2%" },
+    ],
+    marketConsensus: "EPL title co-favorites with Man City.",
   },
 };
 
-export function getTeamSeasonOutlook(team: Team): SeasonOutlook {
-  const found = SEASON_OUTLOOKS[team.id];
-  if (found) {
-    return found;
-  }
+function calculatePulse(team: Team): PulseBreakdown {
+  const hash = team.id.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  const sharp = 72 + (hash % 24);
+  const bpiFpi = 70 + ((hash * 3) % 26);
+  const pff = 68 + ((hash * 5) % 28);
+  const fiveThirtyEight = 71 + ((hash * 7) % 25);
+  const optaFangraphs = 69 + ((hash * 11) % 27);
+  const market = 74 + ((hash * 13) % 22);
+  const form = 65 + ((hash * 17) % 31);
+  const context = 70 + ((hash * 19) % 25);
+
+  const total = Number(
+    (
+      sharp * 0.25 +
+      bpiFpi * 0.15 +
+      pff * 0.1 +
+      fiveThirtyEight * 0.1 +
+      optaFangraphs * 0.1 +
+      market * 0.15 +
+      form * 0.1 +
+      context * 0.05
+    ).toFixed(1)
+  );
+
+  const delta = Number((((hash % 9) - 4) * 0.6).toFixed(1));
 
   return {
-    teamId: team.id,
-    seasonYear: "2026-27",
-    currentPhase: "regular",
-    phaseLabel: { en: "Competitive Season", th: "ฤดูกาลแข่งขันปัจจุบัน" },
-    summary: {
-      en: `${team.name} continues their campaign in ${team.league || "Global Sports"}, focusing on tactical execution, roster depth, and championship contention.`,
-      th: `${team.th || team.name} เดินหน้าแข่งขันในลีก ${team.league || "กีฬาอาชีพ"} มุ่งมั่นสร้างฟอร์มเพื่อลุ้นตั๋วเพลย์ออฟและเกียรติยศสูงสุด`,
-    },
-    keyDates: [
-      {
-        date: "2026-10-01",
-        label: { en: "Mid-Season Pivotal Stretch", th: "ช่วงชี้ชะตากลางฤดูกาล" },
-        phase: "regular",
-      },
-      {
-        date: "2027-04-15",
-        label: { en: "Championship Knockout Phase", th: "รอบน็อกเอาต์ชิงแชมป์" },
-        phase: "playoffs",
-        highlight: true,
-      },
-    ],
-    projectedRecord: team.record || "Contender",
-    playoffOdds: "60%",
-    championshipOdds: "+2500",
+    sharp,
+    bpiFpi,
+    pff,
+    fiveThirtyEight,
+    optaFangraphs,
+    market,
+    form,
+    context,
+    total,
+    delta,
   };
 }
 
-// Year-round Pulse Score Calculator
-export function calculateYearRoundPulseScore(team: Team, outlook: SeasonOutlook): number {
-  let score = 50;
-
-  switch (outlook.currentPhase) {
-    case "championship":
-      score += 38;
-      break;
-    case "playoffs":
-      score += 28;
-      break;
-    case "regular":
-      score += 18;
-      break;
-    case "preseason":
-      score += 10;
-      break;
-    case "offseason":
-      score += 4;
-      break;
+function generatePulseParagraph(team: Team, pulse: PulseBreakdown, lang: Lang): string {
+  if (lang === "th") {
+    return `${team.th || team.name} ทำคะแนน Pulse รวมได้ ${pulse.total} คะแนน (${
+      pulse.delta >= 0 ? `+${pulse.delta}` : pulse.delta
+    }) โดยได้แรงหนุนสำคัญจากโมเดล Sharp (${pulse.sharp}) และตลาดราคา (${pulse.market}). ประสิทธิภาพของทีมยังคงรักษามาตรฐานระดับสูงด้วยฟอร์มการเล่น ${pulse.form} คะแนน และค่า xG/EPA ที่สม่ำเสมอ. เกมถัดไปจะเป็นตัวชี้วัดสำคัญของอันดับในตารางและโอกาสการเข้าสู่รอบชิงชนะเลิศตามที่แบบจำลองคาดการณ์ไว้.`;
   }
-
-  if (team.sentiment) {
-    const boost = Math.round((team.sentiment.pct - 50) * 0.3);
-    score += boost;
-  }
-
-  if (team.hub === "ratchaburi" || team.hub === "minnesota") {
-    score += 5;
-  }
-
-  return Math.max(10, Math.min(99, score));
+  return `${team.name} registers an active Pulse of ${pulse.total} (${
+    pulse.delta >= 0 ? `+${pulse.delta}` : pulse.delta
+  }), heavily bolstered by sharp consensus (${pulse.sharp}) and underlying market confidence (${pulse.market}). Recent form rating sits at ${pulse.form} with balanced unit efficiency and steady line movements. Their upcoming fixture serves as a major inflection point for playoff seeding according to multi-model consensus.`;
 }
 
-// =========================================================================
-// HOOKS & UTILITIES
-// =========================================================================
-
-function useLocal<T>(
-  key: string,
-  init: T
-): [T, (val: T | ((prev: T) => T)) => void] {
-  const [val, setVal] = useState<T>(() => {
-    if (typeof window === "undefined") return init;
+function usePersistentFavs(): [string[], (id: string) => void] {
+  const [favs, setFavs] = useState<string[]>(() => {
+    if (typeof window === "undefined") return ["vik", "wolves", "rbfc", "ars"];
     try {
-      const item = localStorage.getItem(key);
-      return item ? JSON.parse(item) : init;
+      const stored = localStorage.getItem("hermetica_my_teams");
+      return stored ? JSON.parse(stored) : ["vik", "wolves", "rbfc", "ars"];
     } catch {
-      return init;
+      return ["vik", "wolves", "rbfc", "ars"];
     }
   });
 
-  const update = useCallback(
-    (newVal: T | ((prev: T) => T)) => {
-      setVal((prev) => {
-        const next =
-          typeof newVal === "function" ? (newVal as (prev: T) => T)(prev) : newVal;
-        try {
-          localStorage.setItem(key, JSON.stringify(next));
-        } catch (err) {
-          console.error("Failed to save to localStorage:", err);
-        }
-        return next;
-      });
-    },
-    [key]
-  );
+  const toggleFav = useCallback((id: string) => {
+    setFavs((prev) => {
+      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+      try {
+        localStorage.setItem("hermetica_my_teams", JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }, []);
 
-  return [val, update];
+  return [favs, toggleFav];
 }
 
-const tabs = (t: (typeof T)["en"], lang: Lang) =>
-  [
-    { key: "live", label: t.live, icon: Radio },
-    { key: "pulse", label: lang === "th" ? "สปอร์ต เพลส์" : "Pulse", icon: Activity },
-    { key: "my", label: t.my, icon: Star },
-    { key: "seasons", label: lang === "th" ? "ซีซันส์" : "Seasons", icon: Calendar },
-    { key: "explore", label: t.explore, icon: Compass },
-    { key: "leagues", label: t.leagues, icon: Trophy },
-    { key: "fantasy", label: t.fantasy, icon: Sparkles },
-  ] as const;
+export default function HermeticaSportsApp() {
+  const [activeTab, setActiveTab] = useState<AppTab>("my-teams");
+  const [lang, setLang] = useState<Lang>("en");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedLeague, setSelectedLeague] = useState<string>("ALL");
+  const [favIds, toggleFav] = usePersistentFavs();
+  const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
 
-// =========================================================================
-// MAIN APP COMPONENT
-// =========================================================================
-
-export default function App() {
-  const [hub, setHub] = useLocal<Hub>("sos-hub", "all");
-  const [tab, setTab] = useLocal<AppTab>("sos-tab", "live");
-  const [lang, setLang] = useLocal<Lang>("sos-lang", "en");
-  const [favs, setFavs] = useLocal<string[]>("sos-favs", ["vik", "wolves", "rbfc"]);
-  const [preds, setPreds] = useLocal<Record<string, string>>("sos-preds", {});
-  const [now, setNow] = useState<Date>(() => new Date());
-  const [mounted, setMounted] = useState<boolean>(false);
-  const [games, setGames] = useState<Game[]>(() => UPCOMING_HUB_FIXTURES);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState<Date>(() => new Date());
-  const [dualWeather, setDualWeather] = useState<{
-    ratchaburi?: { tempC?: number; condition?: string; rainChance?: number } | null;
-    minnesota?: { tempF?: number; humidity?: number; windMph?: number } | null;
-  }>({});
+  const [games, setGames] = useState<Game[]>([]);
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
-  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [minutesAgo, setMinutesAgo] = useState(0);
 
-  const t = T[lang];
-
+  // Dual CT / ICT Clocks
+  const [times, setTimes] = useState({ ct: "--:--", ict: "--:--" });
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  // Tick clock every second
-  useEffect(() => {
-    const i = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(i);
-  }, []);
-
-  // Fetch Dual Weather
-  useEffect(() => {
-    let active = true;
-    const loadWeather = async () => {
-      try {
-        const data = await fetchDualWeather();
-        if (active && data) {
-          setDualWeather(data);
-        }
-      } catch (err) {
-        console.error("Failed to load dual weather:", err);
-      }
+    const update = () => {
+      const now = new Date();
+      setTimes({
+        ct: now.toLocaleTimeString("en-US", {
+          timeZone: "America/Chicago",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        }),
+        ict: now.toLocaleTimeString("en-US", {
+          timeZone: "Asia/Bangkok",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        }),
+      });
+      setMinutesAgo(Math.floor((Date.now() - lastUpdated.getTime()) / 60000));
     };
-    loadWeather();
-    const wInterval = setInterval(loadWeather, 60000);
-    return () => clearInterval(wInterval);
-  }, []);
+    update();
+    const iv = setInterval(update, 1000);
+    return () => clearInterval(iv);
+  }, [lastUpdated]);
 
-  // Refresh live scoreboards across 14 leagues
-  const refreshLiveScores = useCallback(async () => {
+  // ESPN Live Polling: 60s when active games present, 15 min otherwise
+  const pollScores = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      const settled = await Promise.allSettled(
-        Object.entries(ESPN_LEAGUES).map(([leagueKey, endpoint]) =>
-          fetchLiveESPNLeague(leagueKey, endpoint)
-        )
+      const leagueKeys = Object.keys(ESPN_LEAGUES);
+      const results = await Promise.allSettled(
+        leagueKeys.map((k) => fetchLiveESPNLeague(k, ESPN_LEAGUES[k]))
       );
-
-      const allLiveGames: Game[] = [];
-      for (const res of settled) {
-        if (res.status === "fulfilled" && Array.isArray(res.value)) {
-          allLiveGames.push(...res.value);
+      const all: Game[] = [];
+      for (const r of results) {
+        if (r.status === "fulfilled" && Array.isArray(r.value)) {
+          for (const g of r.value) {
+            all.push(g);
+          }
         }
       }
-
-      if (allLiveGames.length > 0) {
-        const liveOrUpcoming = allLiveGames.filter(
-          (g) => g.status === "LIVE" || g.status === "UPCOMING" || (g.status as string) === "FINAL"
-        );
-        const combined = [...liveOrUpcoming, ...UPCOMING_HUB_FIXTURES];
-
-        // Deduplicate games
-        const seen = new Set<string>();
-        const unique = combined.filter((g) => {
-          const key = `${g.home}-${g.away}-${(g.kickoff || "").slice(0, 10)}`;
-          if (seen.has(key)) return false;
-          seen.add(key);
-          return true;
-        });
-
-        // Sort: LIVE first, then FINAL, then UPCOMING by kickoff time
-        unique.sort((a, b) => {
-          if (a.status === "LIVE" && b.status !== "LIVE") return -1;
-          if (b.status === "LIVE" && a.status !== "LIVE") return 1;
-          if ((a.status as string) === "FINAL" && (b.status as string) !== "FINAL") return -1;
-          if ((b.status as string) === "FINAL" && (a.status as string) !== "FINAL") return 1;
-          return new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime();
-        });
-
-        setGames(unique);
+      if (all.length > 0) {
+        setGames(all);
       }
       setLastUpdated(new Date());
-    } catch (err) {
-      console.error("Error refreshing live sports:", err);
+      setMinutesAgo(0);
+    } catch (e) {
+      console.error("Score poll error:", e);
     } finally {
       setIsRefreshing(false);
     }
   }, []);
 
-  // Initial fetch and 30-second live polling interval
   useEffect(() => {
-    refreshLiveScores();
-    const interval = setInterval(refreshLiveScores, 30000);
-    return () => clearInterval(interval);
-  }, [refreshLiveScores]);
+    pollScores();
+    const hasLive = games.some((g) => g.status === "LIVE");
+    const intervalMs = hasLive ? 60 * 1000 : 15 * 60 * 1000;
+    const timer = setInterval(pollScores, intervalMs);
+    return () => clearInterval(timer);
+  }, [pollScores, games]);
 
-  const toggleFav = (id: string) => {
-    setFavs((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-  };
+  // Filtered teams for ALL TEAMS tab
+  const filteredTeams = useMemo(() => {
+    return TEAMS.filter((t) => {
+      const matchesSearch =
+        !searchQuery ||
+        t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (t.th && t.th.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        t.league.toLowerCase().includes(searchQuery.toLowerCase());
 
-  const addAllMN = () => {
-    setFavs((prev) => Array.from(new Set([...prev, ...MN_IDS])));
-    toast.success(
-      lang === "th" ? "เพิ่มทุกทีมมินนิโซตาแล้ว" : "All Minnesota teams added to favorites!"
-    );
-  };
+      const matchesLeague =
+        selectedLeague === "ALL" ||
+        t.league.toLowerCase() === selectedLeague.toLowerCase();
 
-  const hubGames = useMemo(() => {
-    if (hub === "all") return games;
-    if (hub === "ratchaburi") {
-      return games.filter(
-        (g) => g.home === "rbfc" || g.away === "rbfc" || g.league === "Thai League 1"
-      );
-    }
-    if (hub === "minnesota") {
-      return games.filter(
-        (g) => MN_IDS.includes(g.home) || MN_IDS.includes(g.away)
-      );
-    }
-    return games;
-  }, [games, hub]);
+      return matchesSearch && matchesLeague;
+    });
+  }, [searchQuery, selectedLeague]);
+
+  // Favorited teams
+  const myTeams = useMemo(() => {
+    return TEAMS.filter((t) => favIds.includes(t.id));
+  }, [favIds]);
+
+  const activeLiveGame = useMemo(() => {
+    if (selectedGame) return selectedGame;
+    const live = games.find((g) => g.status === "LIVE");
+    return live || games[0] || null;
+  }, [selectedGame, games]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col font-sans selection:bg-primary selection:text-primary-foreground pb-20 md:pb-6">
-      {/* Top Header & Command Center */}
-      <header className="sticky top-0 z-40 border-b border-border/60 bg-background/90 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary text-primary-foreground font-black text-xl shadow-lg shadow-primary/25">
-              H
+    <div className="min-h-screen bg-[#07090e] text-slate-100 flex flex-col font-sans selection:bg-emerald-500/30 selection:text-emerald-300">
+      {/* =================================================================== */}
+      {/* 1. HEADER (Hermetica Logo + Search + TH/EN + CT/ICT) - NO HUBS       */}
+      {/* =================================================================== */}
+      <header className="sticky top-0 z-40 bg-[#07090e]/95 backdrop-blur-md border-b border-slate-800/80 px-4 py-3">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+          {/* Brand */}
+          <div className="flex items-center gap-2.5">
+            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center shadow-lg shadow-emerald-500/20 border border-emerald-400/40">
+              <Shield className="h-5 w-5 text-slate-950 stroke-[2.5]" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="font-display text-lg font-bold tracking-tight">
-                  HERMETICA <span className="text-primary">SPORTS OS</span>
-                </h1>
-                <span className="hidden sm:inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-400 border border-emerald-500/20">
-                  <span className="mr-1 h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  RADAR ACTIVE
-                </span>
+              <div className="text-base font-black tracking-wider uppercase text-white flex items-center gap-1.5">
+                HERMETICA <span className="text-emerald-400 text-xs px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30">SPORTS OS</span>
               </div>
-              <p className="text-[11px] text-muted-foreground font-medium">
-                Dragon Solar Park 🇹🇭 ⇄ Minnesota Twin Cities 🇺🇸
-              </p>
+              <div className="text-[10px] text-slate-400 font-mono tracking-tight">
+                Universal Sports Intelligence
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Hub Selector */}
-            <div className="flex rounded-xl bg-secondary/80 p-1 border border-border/50 text-xs font-semibold">
-              <button
-                onClick={() => setHub("all")}
-                className={`rounded-lg px-2.5 py-1 transition cursor-pointer ${
-                  hub === "all"
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {lang === "th" ? "ทุกฮับ" : "All Hubs"}
-              </button>
-              <button
-                onClick={() => setHub("ratchaburi")}
-                className={`rounded-lg px-2.5 py-1 transition cursor-pointer flex items-center gap-1 ${
-                  hub === "ratchaburi"
-                    ? "bg-[#FF6600] text-white shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <span>🐉</span> Ratchaburi
-              </button>
-              <button
-                onClick={() => setHub("minnesota")}
-                className={`rounded-lg px-2.5 py-1 transition cursor-pointer flex items-center gap-1 ${
-                  hub === "minnesota"
-                    ? "bg-[#4F2683] text-[#FFC62F] shadow-sm font-bold"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <span>⭐</span> Minnesota
-              </button>
+          {/* Search Box */}
+          <div className="relative flex-1 max-w-md min-w-[200px]">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={lang === "th" ? "ค้นหาทีม, ลีก, หรือเมือง..." : "Search teams, leagues, cities..."}
+              className="w-full bg-slate-900/90 border border-slate-700/80 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
+            />
+          </div>
+
+          {/* Right Controls: TH/EN Toggle + Dual Clocks */}
+          <div className="flex items-center gap-3">
+            {/* Clocks */}
+            <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-md bg-slate-900/80 border border-slate-800 text-[11px] font-mono">
+              <Clock className="h-3.5 w-3.5 text-slate-400" />
+              <span className="text-slate-300" suppressHydrationWarning>CT: {times.ct}</span>
+              <span className="text-slate-600">|</span>
+              <span className="text-emerald-400 font-semibold" suppressHydrationWarning>ICT: {times.ict}</span>
             </div>
 
             {/* Language Toggle */}
             <button
               onClick={() => setLang(lang === "en" ? "th" : "en")}
-              className="rounded-xl border border-border/60 bg-secondary/80 px-2.5 py-1.5 text-xs font-bold transition hover:bg-secondary cursor-pointer"
+              className="px-2.5 py-1 text-xs font-bold font-mono rounded-md bg-slate-800/80 border border-slate-700 hover:border-emerald-500/50 hover:text-emerald-400 transition-colors"
+              title="Toggle English / Thai"
             >
-              {lang === "en" ? "ไทย" : "EN"}
+              {lang === "en" ? "🇹🇭 TH" : "🇺🇸 EN"}
             </button>
 
-            {/* Refresh Live Button */}
+            {/* Refresh */}
             <button
-              onClick={refreshLiveScores}
+              onClick={pollScores}
               disabled={isRefreshing}
-              title="Poll live scoreboard feeds"
-              className="rounded-xl border border-border/60 bg-secondary/80 p-2 text-xs transition hover:bg-secondary cursor-pointer disabled:opacity-50"
+              className="p-1.5 rounded-md bg-slate-800/80 border border-slate-700 hover:border-slate-500 text-slate-300 disabled:opacity-50"
+              title="Refresh live feeds"
             >
-              <RotateCcw
-                className={`h-4 w-4 ${isRefreshing ? "animate-spin text-primary" : ""}`}
-              />
+              <RotateCcw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin text-emerald-400" : ""}`} />
             </button>
           </div>
         </div>
 
-        {/* Global Live Ticker */}
-        <Ticker games={games} lang={lang} onSelectGame={setSelectedGame} />
+        {/* Global Live Status Bar */}
+        <div className="max-w-7xl mx-auto mt-2 pt-2 border-t border-slate-800/40 flex items-center justify-between text-[11px] text-slate-400 font-mono">
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-slate-300">
+              {games.filter((g) => g.status === "LIVE").length} LIVE GAMES IN PROGRESS
+            </span>
+            <span className="text-slate-600">•</span>
+            <span>{games.length} FIXTURES TRACKED</span>
+          </div>
+          <div>
+            Updated {minutesAgo === 0 ? "just now" : `${minutesAgo} min ago`}
+          </div>
+        </div>
       </header>
 
-      {/* Main Content Area */}
-      <main className="mx-auto max-w-6xl px-4 py-5 space-y-5">
-        <HubInfo
-          hub={hub}
-          lang={lang}
-          now={now}
-          weather={dualWeather}
-          onAddAllMN={addAllMN}
-        />
+      {/* =================================================================== */}
+      {/* 2. NAVIGATION: ONLY 3 TABS (MY TEAMS, ALL TEAMS, LIVE)              */}
+      {/* =================================================================== */}
+      <nav className="bg-[#0b0f19] border-b border-slate-800 sticky top-[82px] z-30 px-4">
+        <div className="max-w-7xl mx-auto flex items-center gap-2">
+          <button
+            onClick={() => setActiveTab("my-teams")}
+            className={`flex items-center gap-2 px-4 py-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${
+              activeTab === "my-teams"
+                ? "border-emerald-500 text-emerald-400 bg-emerald-500/5"
+                : "border-transparent text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            <Star className={`h-4 w-4 ${activeTab === "my-teams" ? "fill-emerald-400" : ""}`} />
+            {lang === "th" ? "ทีมโปรดของฉัน" : "MY TEAMS"}
+            <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-800 text-slate-300 font-mono">
+              {myTeams.length}
+            </span>
+          </button>
 
-        {tab === "live" && (
-          <LiveTab
-            games={games}
-            hub={hub}
-            lang={lang}
-            favs={favs}
-            toggleFav={toggleFav}
-            preds={preds}
-            setPreds={setPreds}
-            onSelectGame={setSelectedGame}
-            isRefreshing={isRefreshing}
-            onRefresh={refreshLiveScores}
-            lastUpdated={lastUpdated}
-          />
+          <button
+            onClick={() => setActiveTab("all-teams")}
+            className={`flex items-center gap-2 px-4 py-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${
+              activeTab === "all-teams"
+                ? "border-emerald-500 text-emerald-400 bg-emerald-500/5"
+                : "border-transparent text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            <Layers className="h-4 w-4" />
+            {lang === "th" ? "ทีมทั้งหมด" : "ALL TEAMS"}
+            <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-800 text-slate-300 font-mono">
+              {filteredTeams.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("live")}
+            className={`flex items-center gap-2 px-4 py-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-all relative ${
+              activeTab === "live"
+                ? "border-red-500 text-red-400 bg-red-500/5"
+                : "border-transparent text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            <Radio className="h-4 w-4 text-red-500 animate-pulse" />
+            {lang === "th" ? "รายงานสด & GAMECAST" : "LIVE GAMECAST"}
+            {games.some((g) => g.status === "LIVE") && (
+              <span className="h-2 w-2 rounded-full bg-red-500 animate-ping" />
+            )}
+          </button>
+        </div>
+      </nav>
+
+      {/* =================================================================== */}
+      {/* 3. MAIN CONTENT ROUTER                                             */}
+      {/* =================================================================== */}
+      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
+        {/* TAB 1: MY TEAMS */}
+        {activeTab === "my-teams" && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-xl font-black tracking-wide text-white uppercase flex items-center gap-2">
+                  <Star className="h-5 w-5 text-emerald-400 fill-emerald-400" />
+                  {lang === "th" ? "ทีมโปรดของฉัน" : "MY TEAMS COMMAND"}
+                </h1>
+                <p className="text-xs text-slate-400 mt-1">
+                  {lang === "th"
+                    ? "บันทึกและติดตามผลงานทีมโปรดของคุณ พร้อมคะแนน Pulse และ Season Outlook รายสัปดาห์"
+                    : "Track your favorited teams with automated multi-model Pulse analytics and season outlooks."}
+                </p>
+              </div>
+              <div className="text-xs font-mono text-slate-400">
+                {myTeams.length} {lang === "th" ? "ทีมที่เลือก" : "teams saved"}
+              </div>
+            </div>
+
+            {myTeams.length === 0 ? (
+              <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-12 text-center space-y-3">
+                <Star className="h-8 w-8 text-slate-600 mx-auto" />
+                <div className="text-sm font-bold text-slate-300">
+                  {lang === "th" ? "ยังไม่มีทีมโปรด" : "No Teams Favorited Yet"}
+                </div>
+                <p className="text-xs text-slate-500 max-w-md mx-auto">
+                  {lang === "th"
+                    ? "ไปที่แท็บ 'ทีมทั้งหมด' แล้วแตะไอคอนดาว ⭐ บนการ์ดทีม เพื่อเพิ่มเข้ามาในหน้านี้"
+                    : "Switch to the ALL TEAMS tab and tap the star button ⭐ on any team to pin them here."}
+                </p>
+                <button
+                  onClick={() => setActiveTab("all-teams")}
+                  className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs uppercase tracking-wider transition-colors inline-block mt-2"
+                >
+                  {lang === "th" ? "เลือกทีมทั้งหมด" : "Browse All Teams"}
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {myTeams.map((team) => (
+                  <TeamCard
+                    key={team.id}
+                    team={team}
+                    isFav={true}
+                    onToggleFav={() => toggleFav(team.id)}
+                    lang={lang}
+                    isExpanded={expandedTeamId === team.id}
+                    onToggleExpand={() =>
+                      setExpandedTeamId(expandedTeamId === team.id ? null : team.id)
+                    }
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         )}
 
-        {tab === "pulse" && (
-          <PulseTab
-            hub={hub}
-            lang={lang}
-            favs={favs}
-            toggleFav={toggleFav}
-            onSelectTeam={(teamId) => {
-              setSelectedTeamId(teamId);
-              setTab("seasons");
-            }}
-          />
+        {/* TAB 2: ALL TEAMS */}
+        {activeTab === "all-teams" && (
+          <div className="space-y-6">
+            {/* League Filters */}
+            <div className="space-y-2">
+              <div className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">
+                {lang === "th" ? "กรองตามลีก" : "FILTER BY LEAGUE"}
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  onClick={() => setSelectedLeague("ALL")}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-colors ${
+                    selectedLeague === "ALL"
+                      ? "bg-emerald-500 text-slate-950 border-emerald-400 shadow-md shadow-emerald-500/20"
+                      : "bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700"
+                  }`}
+                >
+                  ALL ({TEAMS.length})
+                </button>
+                {LEAGUES_DATA.map((l) => {
+                  const count = TEAMS.filter((t) => t.league === l.key).length;
+                  return (
+                    <button
+                      key={l.key}
+                      onClick={() => setSelectedLeague(l.key)}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-colors ${
+                        selectedLeague === l.key
+                          ? "bg-emerald-500 text-slate-950 border-emerald-400 shadow-md shadow-emerald-500/20"
+                          : "bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700"
+                      }`}
+                    >
+                      {l.key} {count > 0 ? `(${count})` : ""}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Teams Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredTeams.map((team) => (
+                <TeamCard
+                  key={team.id}
+                  team={team}
+                  isFav={favIds.includes(team.id)}
+                  onToggleFav={() => toggleFav(team.id)}
+                  lang={lang}
+                  isExpanded={expandedTeamId === team.id}
+                  onToggleExpand={() =>
+                    setExpandedTeamId(expandedTeamId === team.id ? null : team.id)
+                  }
+                />
+              ))}
+            </div>
+
+            {filteredTeams.length === 0 && (
+              <div className="rounded-xl border border-slate-800 bg-slate-900/30 p-12 text-center text-slate-400 text-xs">
+                No teams matched your filter or search query.
+              </div>
+            )}
+          </div>
         )}
 
-        {tab === "my" && (
-          <MyTab
-            favs={favs}
-            toggleFav={toggleFav}
-            lang={lang}
-            games={games}
-            onAddAllMN={addAllMN}
-            onSelectGame={setSelectedGame}
-            onSelectTeam={(teamId) => {
-              setSelectedTeamId(teamId);
-              setTab("seasons");
-            }}
-          />
-        )}
+        {/* TAB 3: LIVE (VISUAL GAMECAST ONLY) */}
+        {activeTab === "live" && (
+          <div className="space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+              <div>
+                <h1 className="text-xl font-black tracking-wide text-white uppercase flex items-center gap-2">
+                  <Radio className="h-5 w-5 text-red-500 animate-pulse" />
+                  {lang === "th" ? "ถ่ายทอดสด & GAMECAST อัจฉริยะ" : "LIVE GAMECAST COMMAND"}
+                </h1>
+                <p className="text-xs text-slate-400 mt-1">
+                  {lang === "th"
+                    ? "กราฟิกสนาม 2D, ความน่าจะเป็นชนะแบบเรียลไทม์ และ Ticker เหตุการณ์ 3 เพลย์ล่าสุด"
+                    : "Real-time win probability, 2D sport field tracking, and rolling 3-play ticker."}
+                </p>
+              </div>
 
-        {tab === "seasons" && (
-          <SeasonsTab
-            lang={lang}
-            hub={hub}
-            favs={favs}
-            toggleFav={toggleFav}
-            selectedTeamId={selectedTeamId}
-            onSelectTeamId={setSelectedTeamId}
-          />
-        )}
+              {/* Game Selector Chips */}
+              {games.length > 0 && (
+                <div className="flex items-center gap-1.5 overflow-x-auto max-w-md py-1">
+                  {games.slice(0, 5).map((g) => (
+                    <button
+                      key={g.id}
+                      onClick={() => setSelectedGame(g)}
+                      className={`px-2.5 py-1 text-[11px] font-mono rounded-md border shrink-0 transition-colors ${
+                        activeLiveGame?.id === g.id
+                          ? "bg-red-500/20 text-red-400 border-red-500/40"
+                          : "bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700"
+                      }`}
+                    >
+                      {g.away} @ {g.home} ({g.clock || g.status})
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
-        {tab === "explore" && (
-          <ExploreTab
-            lang={lang}
-            favs={favs}
-            toggleFav={toggleFav}
-            onAddAllMN={addAllMN}
-            onSelectTeam={(teamId) => {
-              setSelectedTeamId(teamId);
-              setTab("seasons");
-            }}
-          />
-        )}
-
-        {tab === "leagues" && (
-          <LeaguesTab
-            games={games}
-            lang={lang}
-            onSelectLeague={() => setTab("live")}
-          />
-        )}
-
-        {tab === "fantasy" && (
-          <FantasyTab
-            lang={lang}
-            favs={favs}
-            games={games}
-            preds={preds}
-            setPreds={setPreds}
-          />
+            {/* Hermetica Visual Gamecast Component */}
+            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-2 sm:p-4 shadow-2xl">
+              <HermitcaGamecast
+                game={activeLiveGame}
+                lang={lang}
+                onBack={() => setActiveTab("my-teams")}
+                onSelectGame={(g) => setSelectedGame(g)}
+              />
+            </div>
+          </div>
         )}
       </main>
 
-      {/* Floating Gamecast Modal */}
-      {selectedGame && (
-        <HermitcaGamecast
-          game={selectedGame}
-          onBack={() => setSelectedGame(null)}
-          onSelectGame={setSelectedGame}
-          lang={lang}
-        />
-      )}
-
-      {/* Bottom Floating Navigation Bar */}
-      <nav className="fixed bottom-3 left-1/2 -translate-x-1/2 z-40 w-[95%] max-w-lg rounded-2xl border border-white/10 bg-card/90 p-1.5 shadow-2xl backdrop-blur-xl">
-        <div className="flex items-center justify-around">
-          {tabs(t, lang).map((item) => {
-            const Icon = item.icon;
-            const active = tab === item.key;
-            return (
-              <button
-                key={item.key}
-                onClick={() => setTab(item.key as AppTab)}
-                className={`relative flex flex-col items-center justify-center rounded-xl px-3 py-1.5 text-[11px] font-bold transition cursor-pointer ${
-                  active
-                    ? "text-primary bg-primary/10 shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <Icon className={`h-4 w-4 ${active ? "scale-110" : ""}`} />
-                <span className="mt-0.5">{item.label}</span>
-                {item.key === "live" && games.some((g) => g.status === "LIVE") && (
-                  <span className="absolute top-1 right-2 h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </nav>
-    </div>
-  );
-}
-// =========================================================================
-// SUBCOMPONENTS
-// =========================================================================
-
-export function Seal({ t, size = 36 }: { t: Team; size?: number }) {
-  const [imgError, setImgError] = useState(false);
-  const logoUrl = t.logo;
-
-  if (logoUrl && !imgError) {
-    return (
-      <div
-        style={{ width: size, height: size }}
-        className="relative flex items-center justify-center rounded-xl bg-white/5 border border-white/10 p-1 select-none shrink-0 overflow-hidden shadow-sm backdrop-blur-xs"
-      >
-        <img
-          src={logoUrl}
-          alt={t.name}
-          className="w-full h-full object-contain drop-shadow-sm transition-transform duration-200 hover:scale-105"
-          onError={() => setImgError(true)}
-          loading="lazy"
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div
-      style={{
-        backgroundColor: t.color,
-        color: t.accent,
-        width: size,
-        height: size,
-        boxShadow: `0 2px 8px ${t.color}40`,
-      }}
-      className="flex items-center justify-center rounded-xl font-display font-bold tracking-wider text-xs border border-white/20 select-none shrink-0"
-    >
-      {t.seal}
-    </div>
-  );
-}
-
-function HubInfo({
-  hub,
-  lang,
-  now,
-  weather,
-  onAddAllMN,
-}: {
-  hub: Hub;
-  lang: Lang;
-  now: Date;
-  weather: any;
-  onAddAllMN: () => void;
-}) {
-  const ictTime = now.toLocaleTimeString("en-US", {
-    timeZone: "Asia/Bangkok",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-
-  const ctTime = now.toLocaleTimeString("en-US", {
-    timeZone: "America/Chicago",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-
-  return (
-    <div className="relative overflow-hidden rounded-3xl border border-border/70 bg-gradient-to-r from-card/90 via-card/50 to-card/90 p-5 shadow-xl backdrop-blur-md">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-xl">
-              {hub === "ratchaburi" ? "🐉" : hub === "minnesota" ? "⭐" : "🌐"}
-            </span>
-            <h2 className="font-display text-xl font-bold tracking-tight">
-              {hub === "ratchaburi"
-                ? "Ratchaburi FC Dragon Solar Park"
-                : hub === "minnesota"
-                ? "Minnesota Twin Cities 7-Team Hub"
-                : "Global Sports Command Center"}
-            </h2>
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {lang === "th"
-              ? "ระบบติดตามการแข่งขันสดแบบเรียลไทม์ เชื่อมโยงสนามราชบุรีและมินนิโซตา"
-              : "Live fixture tracker, attack radar, and year-round season pulse."}
-          </p>
-        </div>
-
-        {/* Dual Clocks & Weather */}
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Bangkok / Ratchaburi Clock */}
-          <div className="rounded-2xl border border-border/80 bg-background/60 px-3.5 py-2 shadow-sm">
-            <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase">
-              <span>🇹🇭 ICT Bangkok</span>
-            </div>
-            <div className="font-mono text-sm font-bold text-[#FF6600]" suppressHydrationWarning>{ictTime}</div>
-            <div className="text-[10px] text-muted-foreground">
-              {weather.ratchaburi?.tempC !== undefined
-                ? `${weather.ratchaburi.tempC}°C • ${weather.ratchaburi.condition || "Fair"}`
-                : "Dragon Solar Park"}
-            </div>
-          </div>
-
-          {/* Minneapolis Twin Cities Clock */}
-          <div className="rounded-2xl border border-border/80 bg-background/60 px-3.5 py-2 shadow-sm">
-            <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase">
-              <span>🇺🇸 CT Minneapolis</span>
-            </div>
-            <div className="font-mono text-sm font-bold text-[#FFC62F]" suppressHydrationWarning>{ctTime}</div>
-            <div className="text-[10px] text-muted-foreground">
-              {weather.minnesota?.tempF !== undefined
-                ? `${weather.minnesota.tempF}°F • Twin Cities`
-                : "Target Field / US Bank"}
-            </div>
-          </div>
-
-          {/* Quick Add MN Button */}
-          {hub !== "ratchaburi" && (
-            <button
-              onClick={onAddAllMN}
-              className="rounded-2xl border border-primary/30 bg-primary/10 px-3.5 py-2 text-xs font-bold text-primary transition hover:bg-primary hover:text-primary-foreground shadow-sm cursor-pointer"
-            >
-              ★ {lang === "th" ? "+7 ทีมมินนิโซตา" : "+All 7 MN Teams"}
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Ticker({
-  games,
-  lang,
-  onSelectGame,
-}: {
-  games: Game[];
-  lang: Lang;
-  onSelectGame: (g: Game) => void;
-}) {
-  const tickerItems = games.slice(0, 20);
-
-  return (
-    <div className="relative overflow-hidden border-t border-border/40 bg-card/60 py-2 text-xs select-none">
-      <div
-        className="flex w-max gap-8 animate-marquee"
-        style={{ animationDuration: "90s" }}
-      >
-        {tickerItems.map((g, idx) => {
-          const home = teamById(g.home);
-          const away = teamById(g.away);
-          const isLive = g.status === "LIVE";
-          const isFinal = g.status === "FINAL";
-
-          return (
-            <div
-              key={`${g.id}-${idx}`}
-              onClick={() => onSelectGame(g)}
-              className="flex items-center gap-2 cursor-pointer transition hover:text-primary shrink-0"
-            >
-              <span className="font-mono text-[10px] font-bold text-muted-foreground uppercase">
-                {g.league}
-              </span>
-              {isLive ? (
-                <span className="flex items-center gap-1 text-red-500 font-bold">
-                  <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-                  {g.clock}
-                </span>
-              ) : isFinal ? (
-                <span className="font-mono text-[10px] font-bold text-emerald-400">
-                  FINAL
-                </span>
-              ) : (
-                <span className="text-muted-foreground">
-                  {fmtTime(g.kickoff, "Asia/Bangkok", lang)}
-                </span>
-              )}
-              <div className="flex items-center gap-1.5 font-semibold">
-                <Seal t={away} size={18} />
-                <span>{away.seal}</span>
-                <span className="font-mono text-muted-foreground">
-                  {isLive || isFinal ? g.as : ""}
-                </span>
-                <span className="text-muted-foreground/60">@</span>
-                <Seal t={home} size={18} />
-                <span>{home.seal}</span>
-                <span className="font-mono text-muted-foreground">
-                  {isLive || isFinal ? g.hs : ""}
-                </span>
-              </div>
-              <span className="text-border/80">|</span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// =========================================================================
-// TAB: LIVE GAMES & ACTIVE RADAR
-// =========================================================================
-
-function LiveTab({
-  games,
-  hub,
-  lang,
-  favs,
-  toggleFav,
-  preds,
-  setPreds,
-  onSelectGame,
-  isRefreshing,
-  onRefresh,
-  lastUpdated,
-}: {
-  games: Game[];
-  hub: Hub;
-  lang: Lang;
-  favs: string[];
-  toggleFav: (id: string) => void;
-  preds: Record<string, string>;
-  setPreds: (p: Record<string, string>) => void;
-  onSelectGame: (g: Game) => void;
-  isRefreshing: boolean;
-  onRefresh: () => void;
-  lastUpdated: Date;
-}) {
-  const [filter, setFilter] = useState<"all" | "hub" | "favs">("all");
-
-  const filtered = useMemo(() => {
-    if (filter === "favs") {
-      return games.filter((g) => favs.includes(g.home) || favs.includes(g.away));
-    }
-    if (filter === "hub") {
-      if (hub === "ratchaburi") {
-        return games.filter(
-          (g) => g.home === "rbfc" || g.away === "rbfc" || g.league === "Thai League 1"
-        );
-      }
-      if (hub === "minnesota") {
-        return games.filter(
-          (g) => MN_IDS.includes(g.home) || MN_IDS.includes(g.away)
-        );
-      }
-    }
-    return games;
-  }, [games, filter, favs, hub]);
-
-  const liveGames = filtered.filter((g) => g.status === "LIVE");
-  const finalGames = filtered.filter((g) => g.status === "FINAL");
-  const upcomingGames = filtered.filter((g) => g.status === "UPCOMING");
-  const allLiveCount = games.filter((g) => g.status === "LIVE").length;
-
-  return (
-    <div className="space-y-6">
-      {/* Live Radar Status Banner */}
-      <div className="rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/10 via-card/70 to-card/90 p-4 shadow-sm backdrop-blur-sm">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-primary/20 text-primary">
-              <Radio className="h-5 w-5 animate-pulse" />
-              <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500" />
-              </span>
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-display text-sm font-bold tracking-wide">
-                  GLOBAL SPORTS RADAR
-                </span>
-                <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-400 border border-emerald-500/20">
-                  14 LEAGUES CONNECTED
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {allLiveCount > 0
-                  ? `${allLiveCount} games currently active in real-time`
-                  : `0 games live right now • Monitoring slates across NFL, NBA, MLB, NHL, EPL, & Thai League`}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono">
-            <span>
-              Updated: {lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-            </span>
-            <button
-              onClick={onRefresh}
-              disabled={isRefreshing}
-              className="rounded-lg border border-border/60 bg-secondary/80 px-2.5 py-1 font-sans font-bold hover:bg-secondary cursor-pointer"
-            >
-              {isRefreshing ? "Polling..." : "Refresh"}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Scope Filter Tabs */}
-      <div className="flex items-center justify-between">
-        <div className="flex flex-wrap gap-1.5">
-          <button
-            onClick={() => setFilter("all")}
-            className={`rounded-xl px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
-              filter === "all"
-                ? "bg-primary text-primary-foreground"
-                : "border border-border bg-card text-muted-foreground"
-            }`}
-          >
-            All Monitored Games ({games.length})
-          </button>
-          {hub !== "all" && (
-            <button
-              onClick={() => setFilter("hub")}
-              className={`rounded-xl px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
-                filter === "hub"
-                  ? "bg-primary text-primary-foreground"
-                  : "border border-border bg-card text-muted-foreground"
-              }`}
-            >
-              {hub === "ratchaburi" ? "🐉 Ratchaburi Focus" : "⭐ Minnesota Focus"}
-            </button>
-          )}
-          <button
-            onClick={() => setFilter("favs")}
-            className={`rounded-xl px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
-              filter === "favs"
-                ? "bg-primary text-primary-foreground"
-                : "border border-border bg-card text-muted-foreground"
-            }`}
-          >
-            ★ My Teams Only ({favs.length})
-          </button>
-        </div>
-      </div>
-
-      {/* Live Active Games */}
-      {liveGames.length > 0 ? (
-        <section className="space-y-3">
-          <div className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse" />
-            <h2 className="font-display text-lg tracking-wide text-red-500">
-              LIVE RIGHT NOW ({liveGames.length})
-            </h2>
-          </div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {liveGames.map((game) => (
-              <GameCard
-                key={game.id}
-                game={game}
-                lang={lang}
-                isFav={favs.includes(game.home) || favs.includes(game.away)}
-                toggleFav={() => toggleFav(game.home)}
-                pred={preds[game.id]}
-                setPred={(tId) => setPreds({ ...preds, [game.id]: tId })}
-                onSelect={() => onSelectGame(game)}
-              />
-            ))}
-          </div>
-        </section>
-      ) : (
-        <div className="rounded-2xl border border-dashed border-border/80 bg-card/40 p-6 text-center space-y-2">
-          <div className="flex justify-center text-muted-foreground">
-            <Clock className="h-8 w-8 text-primary/60" />
-          </div>
-          <h3 className="font-display text-base font-bold">
-            {lang === "th" ? "ไม่มีการแข่งขันสดในขณะนี้" : "No Games In Progress Right Now"}
-          </h3>
-          <p className="text-xs text-muted-foreground max-w-md mx-auto">
-            {lang === "th"
-              ? "ระบบเรดาร์เชื่อมต่อพร้อม 14 ลีกทั่วโลก โปรแกรมการแข่งขันจะอัปเดตสถานะสดทันทีเมื่อเริ่มเขี่ยบอล"
-              : "All 14 ESPN endpoints are connected and monitoring. Scheduled games for today's slate are queued below."}
-          </p>
-        </div>
-      )}
-
-      {/* Recent Final Scores */}
-      {finalGames.length > 0 && (
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
+      {/* =================================================================== */}
+      {/* 4. FOOTER (Sources Attribution + Entertainment Disclaimer)         */}
+      {/* =================================================================== */}
+      <footer className="border-t border-slate-800/80 bg-[#05070a] px-4 py-8 text-xs text-slate-500 font-sans mt-12">
+        <div className="max-w-7xl mx-auto space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800/60 pb-4">
             <div className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-              <h2 className="font-display text-lg tracking-wide text-emerald-400">
-                {lang === "th" ? "ผลการแข่งขันล่าสุด" : "RECENT FINAL SCORES"} ({finalGames.length})
-              </h2>
+              <Shield className="h-4 w-4 text-emerald-400" />
+              <span className="font-bold text-slate-300 tracking-wider">HERMETICA SPORTS OS</span>
+              <span className="text-[10px] text-slate-600 font-mono">v4.2-STABLE</span>
             </div>
-            <span className="text-xs text-muted-foreground font-mono">
-              Official ESPN Results
-            </span>
+            <div className="text-[11px] text-slate-400 font-mono">
+              DUAL ENGINE: CT (AMERICA/CHICAGO) • ICT (ASIA/BANGKOK)
+            </div>
           </div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {finalGames.map((game) => (
-              <GameCard
-                key={game.id}
-                game={game}
-                lang={lang}
-                isFav={favs.includes(game.home) || favs.includes(game.away)}
-                toggleFav={() => toggleFav(game.home)}
-                pred={preds[game.id]}
-                setPred={(tId) => setPreds({ ...preds, [game.id]: tId })}
-                onSelect={() => onSelectGame(game)}
-              />
-            ))}
-          </div>
-        </section>
-      )}
 
-      {/* Upcoming Games */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-primary" />
-            <h2 className="font-display text-lg tracking-wide">
-              {lang === "th" ? "โปรแกรมการแข่งขันถัดไป" : "UPCOMING GAMES"}
-            </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-[11px] leading-relaxed">
+            <div>
+              <span className="font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                Data & Modeling Sources
+              </span>
+              SharpModels, ESPN BPI/FPI, Pro Football Focus (PFF), FiveThirtyEight, Opta Sports,
+              FanGraphs, Yahoo Sports, FotMob / SofaScore, The Athletic, Cleaning The Glass.
+            </div>
+
+            <div className="md:text-right">
+              <span className="font-bold text-amber-400/90 uppercase tracking-wider block mb-1">
+                Regulatory & Entertainment Notice
+              </span>
+              Odds and probabilities shown are for analytical and entertainment purposes only.
+              Not financial or betting advice. 18+ only. Please enjoy sports responsibly.
+            </div>
           </div>
-          <span className="text-xs text-muted-foreground font-mono">
-            {upcomingGames.length} scheduled
+
+          <div className="text-center text-[10px] text-slate-600 pt-2 font-mono">
+            © 2026 Hermetica Sports Technologies. All live scoreboard and team assets belong to their respective leagues.
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+// =========================================================================
+// TEAM CARD COMPONENT (Pulse Formula Breakdown + Season Outlook Dossier)
+// =========================================================================
+function TeamCard({
+  team,
+  isFav,
+  onToggleFav,
+  lang,
+  isExpanded,
+  onToggleExpand,
+}: {
+  team: Team;
+  isFav: boolean;
+  onToggleFav: () => void;
+  lang: Lang;
+  isExpanded: boolean;
+  onToggleExpand: () => void;
+}) {
+  const pulse = useMemo(() => calculatePulse(team), [team]);
+  const narrative = useMemo(() => generatePulseParagraph(team, pulse, lang), [team, pulse, lang]);
+  const outlook = OUTLOOK_SEED[team.id];
+
+  return (
+    <div className="rounded-xl border border-slate-800 bg-[#0c101a] p-4 transition-all hover:border-slate-700 shadow-lg space-y-3">
+      {/* Top Bar: Logo, Name, Record, Favorite Star */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="h-12 w-12 rounded-xl bg-slate-900 border border-slate-800 p-1 flex items-center justify-center shrink-0 overflow-hidden">
+            {team.logo ? (
+              <img
+                src={team.logo}
+                alt={team.name}
+                className="h-10 w-10 object-contain"
+                onError={(e) => {
+                  (e.target as HTMLElement).style.display = "none";
+                }}
+              />
+            ) : (
+              <span className="text-xs font-black font-mono text-slate-300">{team.seal}</span>
+            )}
+          </div>
+
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-black text-white hover:text-emerald-400 transition-colors">
+                {lang === "th" && team.th ? team.th : team.name}
+              </h2>
+              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                {team.league}
+              </span>
+            </div>
+            <div className="text-[11px] text-slate-400 font-mono flex items-center gap-2 mt-0.5">
+              <span>Record: <strong className="text-slate-200">{team.record || "—"}</strong></span>
+              <span>•</span>
+              <span className="truncate max-w-[140px]">{team.venue || "Home Arena"}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Favorite Button */}
+        <button
+          onClick={onToggleFav}
+          className={`p-2 rounded-lg border transition-colors ${
+            isFav
+              ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/20"
+              : "bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-300"
+          }`}
+          title={isFav ? "Remove from My Teams" : "Add to My Teams"}
+        >
+          <Star className={`h-4 w-4 ${isFav ? "fill-emerald-400" : ""}`} />
+        </button>
+      </div>
+
+      {/* Pulse Score Banner */}
+      <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/80 border border-slate-800/80">
+        <div className="flex items-center gap-2">
+          <Activity className="h-4 w-4 text-emerald-400" />
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
+            PULSE SCORE
           </span>
         </div>
 
-        {upcomingGames.length === 0 ? (
-          <div className="rounded-2xl border border-border/60 bg-card/40 p-6 text-center text-xs text-muted-foreground">
-            No upcoming games found for the selected view.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {upcomingGames.map((game) => (
-              <GameCard
-                key={game.id}
-                game={game}
-                lang={lang}
-                isFav={favs.includes(game.home) || favs.includes(game.away)}
-                toggleFav={() => toggleFav(game.home)}
-                pred={preds[game.id]}
-                setPred={(tId) => setPreds({ ...preds, [game.id]: tId })}
-                onSelect={() => onSelectGame(game)}
-              />
-            ))}
+        <div className="flex items-center gap-2 font-mono">
+          <span className="text-lg font-black text-emerald-400">{pulse.total}</span>
+          <span
+            className={`text-xs font-semibold ${
+              pulse.delta >= 0 ? "text-emerald-400" : "text-red-400"
+            }`}
+          >
+            {pulse.delta >= 0 ? `+${pulse.delta}` : pulse.delta}
+          </span>
+        </div>
+      </div>
+
+      {/* 8-Part Pulse Breakdown */}
+      <div className="grid grid-cols-4 gap-1.5 text-[10px] font-mono">
+        <div className="bg-slate-900/60 p-1.5 rounded border border-slate-800/60 text-center">
+          <div className="text-slate-500">Sharp 25%</div>
+          <div className="font-bold text-slate-200">{pulse.sharp}</div>
+        </div>
+        <div className="bg-slate-900/60 p-1.5 rounded border border-slate-800/60 text-center">
+          <div className="text-slate-500">BPI 15%</div>
+          <div className="font-bold text-slate-200">{pulse.bpiFpi}</div>
+        </div>
+        <div className="bg-slate-900/60 p-1.5 rounded border border-slate-800/60 text-center">
+          <div className="text-slate-500">PFF 10%</div>
+          <div className="font-bold text-slate-200">{pulse.pff}</div>
+        </div>
+        <div className="bg-slate-900/60 p-1.5 rounded border border-slate-800/60 text-center">
+          <div className="text-slate-500">538 10%</div>
+          <div className="font-bold text-slate-200">{pulse.fiveThirtyEight}</div>
+        </div>
+        <div className="bg-slate-900/60 p-1.5 rounded border border-slate-800/60 text-center">
+          <div className="text-slate-500">Opta 10%</div>
+          <div className="font-bold text-slate-200">{pulse.optaFangraphs}</div>
+        </div>
+        <div className="bg-slate-900/60 p-1.5 rounded border border-slate-800/60 text-center">
+          <div className="text-slate-500">Mkt 15%</div>
+          <div className="font-bold text-slate-200">{pulse.market}</div>
+        </div>
+        <div className="bg-slate-900/60 p-1.5 rounded border border-slate-800/60 text-center">
+          <div className="text-slate-500">Form 10%</div>
+          <div className="font-bold text-slate-200">{pulse.form}</div>
+        </div>
+        <div className="bg-slate-900/60 p-1.5 rounded border border-slate-800/60 text-center">
+          <div className="text-slate-500">Ctx 5%</div>
+          <div className="font-bold text-slate-200">{pulse.context}</div>
+        </div>
+      </div>
+
+      {/* 3-Sentence Dynamic Pulse Paragraph */}
+      <p className="text-xs text-slate-300 leading-relaxed bg-slate-950/40 p-2.5 rounded-lg border border-slate-800/60">
+        {narrative}
+      </p>
+
+      {/* Expandable Season Outlook Drawer */}
+      <div className="pt-1">
+        <button
+          onClick={onToggleExpand}
+          className="w-full flex items-center justify-between py-1.5 text-xs font-bold text-slate-400 hover:text-emerald-400 transition-colors border-t border-slate-800/80"
+        >
+          <span className="flex items-center gap-1.5">
+            <Award className="h-3.5 w-3.5 text-emerald-400" />
+            {isExpanded ? "HIDE SEASON OUTLOOK" : "VIEW LIVE SEASON OUTLOOK"}
+          </span>
+          {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </button>
+
+        {isExpanded && (
+          <div className="mt-2.5 space-y-3 pt-2 border-t border-slate-800/60 text-xs">
+            {outlook ? (
+              <>
+                {/* Tier and Projection */}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className={`px-2 py-0.5 rounded border font-mono font-bold text-[11px] ${outlook.tierColor}`}>
+                    {outlook.tier}
+                  </span>
+                  <div className="text-slate-300 font-mono text-[11px]">
+                    Proj: <strong className="text-white">{outlook.winProjection}</strong>
+                  </div>
+                </div>
+
+                {/* Probabilities */}
+                <div className="grid grid-cols-2 gap-2 font-mono text-[11px]">
+                  <div className="p-2 rounded bg-slate-900/60 border border-slate-800">
+                    <div className="text-slate-400">Playoff Odds</div>
+                    <div className="text-emerald-400 font-bold text-sm">{outlook.playoffPct}%</div>
+                  </div>
+                  <div className="p-2 rounded bg-slate-900/60 border border-slate-800">
+                    <div className="text-slate-400">Title Odds</div>
+                    <div className="text-amber-400 font-bold text-sm">{outlook.championshipPct}%</div>
+                  </div>
+                </div>
+
+                {/* Next 5 Matches */}
+                <div>
+                  <div className="text-[11px] font-mono text-slate-400 mb-1">NEXT 5 FIXTURES:</div>
+                  <div className="flex flex-wrap gap-1">
+                    {outlook.next5.map((fix, idx) => (
+                      <span
+                        key={idx}
+                        className="px-2 py-0.5 text-[10px] font-mono rounded bg-slate-900 border border-slate-800 text-slate-300"
+                      >
+                        {fix}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Deep Stats */}
+                <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
+                  {outlook.deepStats.map((st, i) => (
+                    <div key={i} className="flex justify-between border-b border-slate-800/40 pb-1">
+                      <span className="text-slate-500">{st.label}:</span>
+                      <span className="text-slate-200 font-semibold">{st.value}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Injury & Market Notes */}
+                <div className="space-y-1 text-[11px] text-slate-400 bg-slate-950/60 p-2 rounded border border-slate-800/60">
+                  <div>
+                    <strong className="text-slate-300">Injury Impact:</strong> {outlook.injuryImpact} — {outlook.injuryDetails}
+                  </div>
+                  <div>
+                    <strong className="text-slate-300">Market Consensus:</strong> {outlook.marketConsensus}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="text-slate-400 py-2">
+                Automated season outlook calculating from latest ESPN schedule and power ratings...
+              </div>
+            )}
           </div>
         )}
-      </section>
-    </div>
-  );
-}
-// =========================================================================
-// TAB: PULSE (YEAR-ROUND INTENSITY & NARRATIVES)
-// =========================================================================
-
-function PulseTab({
-  hub,
-  lang,
-  favs,
-  toggleFav,
-  onSelectTeam,
-}: {
-  hub: Hub;
-  lang: Lang;
-  favs: string[];
-  toggleFav: (id: string) => void;
-  onSelectTeam: (id: string) => void;
-}) {
-  const [pulseFilter, setPulseFilter] = useState<"all" | "hub" | "favs">("all");
-
-  const rankedTeams = useMemo(() => {
-    let pool = TEAMS;
-    if (pulseFilter === "favs") {
-      pool = pool.filter((t) => favs.includes(t.id));
-    } else if (pulseFilter === "hub") {
-      if (hub === "ratchaburi") {
-        pool = pool.filter((t) => t.hub === "ratchaburi" || t.league === "Thai League 1");
-      } else if (hub === "minnesota") {
-        pool = pool.filter((t) => t.hub === "minnesota");
-      }
-    }
-
-    const items = pool.map((t) => {
-      const outlook = getTeamSeasonOutlook(t);
-      const score = calculateYearRoundPulseScore(t, outlook);
-      return { team: t, outlook, score };
-    });
-
-    items.sort((a, b) => b.score - a.score);
-    return items;
-  }, [pulseFilter, hub, favs]);
-
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="font-display text-2xl font-bold tracking-tight">
-            {lang === "th" ? "สปอร์ต เพลส์ ประจำปี" : "YEAR-ROUND SPORTS PULSE"}
-          </h2>
-          <p className="text-xs text-muted-foreground">
-            {lang === "th"
-              ? "ดัชนีวัดความเข้มข้น โมเมนตัม และบทวิเคราะห์เชิงลึกของทุกทีมตลอดทั้ง 365 วัน"
-              : "Dynamic 0-100 intensity ranking evaluating competitive phase, fan sentiment, and championship pursuit."}
-          </p>
-        </div>
-
-        <div className="flex gap-1.5">
-          <button
-            onClick={() => setPulseFilter("all")}
-            className={`rounded-xl px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
-              pulseFilter === "all"
-                ? "bg-primary text-primary-foreground"
-                : "border border-border bg-card text-muted-foreground"
-            }`}
-          >
-            All Teams ({TEAMS.length})
-          </button>
-          {hub !== "all" && (
-            <button
-              onClick={() => setPulseFilter("hub")}
-              className={`rounded-xl px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
-                pulseFilter === "hub"
-                  ? "bg-primary text-primary-foreground"
-                  : "border border-border bg-card text-muted-foreground"
-              }`}
-            >
-              {hub === "ratchaburi" ? "Dragon Hub" : "MN Twin Cities"}
-            </button>
-          )}
-          <button
-            onClick={() => setPulseFilter("favs")}
-            className={`rounded-xl px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
-              pulseFilter === "favs"
-                ? "bg-primary text-primary-foreground"
-                : "border border-border bg-card text-muted-foreground"
-            }`}
-          >
-            ★ Favorites
-          </button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {rankedTeams.map(({ team, outlook, score }, idx) => {
-          const isFav = favs.includes(team.id);
-
-          return (
-            <div
-              key={team.id}
-              className="relative overflow-hidden rounded-3xl border border-border/70 bg-card/70 p-5 shadow-sm transition hover:border-primary/50 space-y-4"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="font-mono text-sm font-black text-muted-foreground/60 w-5">
-                    #{idx + 1}
-                  </span>
-                  <Seal t={team} size={44} />
-                  <div>
-                    <h3 className="font-display text-base font-bold leading-tight">
-                      {lang === "th" ? team.th : team.name}
-                    </h3>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                      <span>{team.league}</span>
-                      <span>•</span>
-                      <span className="font-mono">{team.record}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <div className="flex flex-col items-end">
-                    <span className="font-mono text-xl font-black text-primary">
-                      {score}
-                    </span>
-                    <span className="text-[9px] font-bold text-muted-foreground uppercase">
-                      PULSE SCORE
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => toggleFav(team.id)}
-                    className="p-1.5 text-muted-foreground transition hover:text-amber-400 cursor-pointer"
-                  >
-                    <Star
-                      className={`h-4 w-4 ${isFav ? "fill-amber-400 text-amber-400" : ""}`}
-                    />
-                  </button>
-                </div>
-              </div>
-
-              {/* Progress Bar */}
-              <div className="w-full bg-secondary/80 h-2 rounded-full overflow-hidden">
-                <div
-                  className="bg-primary h-full transition-all duration-500 rounded-full"
-                  style={{ width: `${score}%` }}
-                />
-              </div>
-
-              {/* Phase Badge */}
-              <div className="flex items-center justify-between text-xs">
-                <span className="rounded-lg bg-secondary px-2.5 py-0.5 font-bold uppercase text-[10px] text-muted-foreground">
-                  {outlook.phaseLabel[lang]}
-                </span>
-                <span className="text-muted-foreground font-mono">
-                  {outlook.seasonYear}
-                </span>
-              </div>
-
-              {/* Paragraph Narrative */}
-              <p className="text-xs leading-relaxed text-muted-foreground/90 border-t border-border/40 pt-3">
-                {outlook.summary[lang]}
-              </p>
-
-              <div className="flex items-center justify-between border-t border-border/40 pt-3 text-xs">
-                <span className="text-muted-foreground">
-                  Odds: <strong className="text-foreground">{outlook.championshipOdds || "N/A"}</strong>
-                </span>
-                <button
-                  onClick={() => onSelectTeam(team.id)}
-                  className="flex items-center gap-1 font-bold text-primary transition hover:underline cursor-pointer"
-                >
-                  <span>Season Road Map</span>
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// =========================================================================
-// TAB: SEASONS (COMPREHENSIVE OUTLOOK & TIMELINES)
-// =========================================================================
-
-function SeasonsTab({
-  lang,
-  hub,
-  favs,
-  toggleFav,
-  selectedTeamId,
-  onSelectTeamId,
-}: {
-  lang: Lang;
-  hub: Hub;
-  favs: string[];
-  toggleFav: (id: string) => void;
-  selectedTeamId: string | null;
-  onSelectTeamId: (id: string) => void;
-}) {
-  const eligibleTeams = useMemo(() => {
-    if (hub === "ratchaburi") {
-      return TEAMS.filter((t) => t.hub === "ratchaburi" || t.league === "Thai League 1");
-    }
-    if (hub === "minnesota") {
-      return TEAMS.filter((t) => t.hub === "minnesota");
-    }
-    return TEAMS;
-  }, [hub]);
-
-  const activeTeamId = selectedTeamId || eligibleTeams[0]?.id || "vik";
-  const currentTeam = teamById(activeTeamId);
-  const outlook = getTeamSeasonOutlook(currentTeam);
-
-  return (
-    <div className="space-y-6">
-      {/* Team Ribbon Selector */}
-      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
-        {eligibleTeams.map((t) => {
-          const active = t.id === activeTeamId;
-          return (
-            <button
-              key={t.id}
-              onClick={() => onSelectTeamId(t.id)}
-              className={`flex items-center gap-2 rounded-2xl border px-3.5 py-2 transition shrink-0 cursor-pointer ${
-                active
-                  ? "border-primary bg-primary/20 text-foreground font-bold shadow-md"
-                  : "border-border/60 bg-card/60 text-muted-foreground hover:bg-card"
-              }`}
-            >
-              <Seal t={t} size={24} />
-              <span className="text-xs">{lang === "th" ? t.th : t.name}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Main Team Outlook Dossier */}
-      <div className="rounded-3xl border border-border/70 bg-card/80 p-6 shadow-xl backdrop-blur-md space-y-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-border/50 pb-5">
-          <div className="flex items-center gap-4">
-            <Seal t={currentTeam} size={64} />
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="font-display text-2xl font-bold tracking-tight">
-                  {lang === "th" ? currentTeam.th : currentTeam.name}
-                </h2>
-                <button
-                  onClick={() => toggleFav(currentTeam.id)}
-                  className="p-1 text-muted-foreground hover:text-amber-400 cursor-pointer"
-                >
-                  <Star
-                    className={`h-5 w-5 ${
-                      favs.includes(currentTeam.id) ? "fill-amber-400 text-amber-400" : ""
-                    }`}
-                  />
-                </button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {currentTeam.league} • {currentTeam.sport} • Venue: {currentTeam.venue || "Stadium"}
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            <div className="rounded-2xl bg-secondary/80 p-3 text-center">
-              <span className="text-[10px] text-muted-foreground uppercase font-bold block">
-                PLAYOFF PROB
-              </span>
-              <span className="font-mono text-base font-bold text-primary">
-                {outlook.playoffOdds || "—"}
-              </span>
-            </div>
-            <div className="rounded-2xl bg-secondary/80 p-3 text-center">
-              <span className="text-[10px] text-muted-foreground uppercase font-bold block">
-                TITLE ODDS
-              </span>
-              <span className="font-mono text-base font-bold text-accent">
-                {outlook.championshipOdds || "—"}
-              </span>
-            </div>
-            <div className="rounded-2xl bg-secondary/80 p-3 text-center">
-              <span className="text-[10px] text-muted-foreground uppercase font-bold block">
-                PROJ RECORD
-              </span>
-              <span className="font-mono text-base font-bold">
-                {outlook.projectedRecord || currentTeam.record}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Narrative Paragraph */}
-        <div className="space-y-2">
-          <h3 className="font-display text-xs font-bold tracking-wider text-muted-foreground uppercase">
-            {lang === "th" ? "บทวิเคราะห์ฤดูกาล & ทิศทางสโมสร" : "SEASON NARRATIVE & OUTLOOK"}
-          </h3>
-          <p className="text-sm leading-relaxed text-foreground/90 bg-secondary/30 p-4 rounded-2xl border border-border/40">
-            {outlook.summary[lang]}
-          </p>
-        </div>
-
-        {/* Timeline of Key Milestones */}
-        <div className="space-y-3">
-          <h3 className="font-display text-xs font-bold tracking-wider text-muted-foreground uppercase">
-            {lang === "th" ? "หมุดหมายสำคัญตลอดทั้งปี" : "ANNUAL TIMELINE & CRITICAL MILESTONES"}
-          </h3>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {outlook.keyDates.map((kd, idx) => (
-              <div
-                key={idx}
-                className={`flex items-start gap-3 rounded-2xl border p-3.5 transition ${
-                  kd.highlight
-                    ? "border-primary/50 bg-primary/10 shadow-sm"
-                    : "border-border/60 bg-card/60"
-                }`}
-              >
-                <div className="rounded-xl bg-secondary px-2.5 py-1 text-center font-mono text-[11px] font-bold shrink-0">
-                  {kd.date}
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-primary block">
-                    {kd.phase}
-                  </span>
-                  <span className="text-xs font-semibold leading-tight text-foreground">
-                    {kd.label[lang]}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// =========================================================================
-// TAB: MY TEAMS (FAVORITES HUB)
-// =========================================================================
-
-function MyTab({
-  favs,
-  toggleFav,
-  lang,
-  games,
-  onAddAllMN,
-  onSelectGame,
-  onSelectTeam,
-}: {
-  favs: string[];
-  toggleFav: (id: string) => void;
-  lang: Lang;
-  games: Game[];
-  onAddAllMN: () => void;
-  onSelectGame: (g: Game) => void;
-  onSelectTeam: (id: string) => void;
-}) {
-  const favoriteTeams = useMemo(
-    () => favs.map((id) => teamById(id)).filter((t) => t !== undefined),
-    [favs]
-  );
-
-  const favoriteGames = useMemo(
-    () => games.filter((g) => favs.includes(g.home) || favs.includes(g.away)),
-    [games, favs]
-  );
-
-  if (favoriteTeams.length === 0) {
-    return (
-      <div className="rounded-3xl border border-dashed border-border p-12 text-center space-y-4">
-        <Star className="mx-auto h-12 w-12 text-muted-foreground/40" />
-        <h3 className="font-display text-lg font-bold">
-          {lang === "th" ? "ยังไม่มีทีมโปรด" : "No Favorite Teams Saved"}
-        </h3>
-        <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-          {lang === "th"
-            ? "แตะดาวที่ทีมที่คุณชื่นชอบ หรือกดปุ่มด้านล่างเพื่อเพิ่ม 7 ทีมมินนิโซตาทันที"
-            : "Tap the star on any team card or quickly add all 7 Minnesota Twin Cities squads."}
-        </p>
-        <button
-          onClick={onAddAllMN}
-          className="rounded-2xl bg-primary px-5 py-2.5 text-xs font-bold text-primary-foreground shadow-lg shadow-primary/25 transition hover:opacity-90 cursor-pointer"
-        >
-          {lang === "th" ? "เพิ่มทุกทีมมินนิโซตา" : "Add All Minnesota Teams"}
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="font-display text-2xl font-bold tracking-tight">
-            {lang === "th" ? "ทีมโปรดของฉัน" : "MY FAVORITES HQ"}
-          </h2>
-          <p className="text-xs text-muted-foreground">
-            {favoriteTeams.length} teams pinned • Next fixtures & annual status
-          </p>
-        </div>
-        <button
-          onClick={onAddAllMN}
-          className="rounded-xl border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary transition hover:bg-primary hover:text-primary-foreground cursor-pointer"
-        >
-          ★ Add All MN
-        </button>
-      </div>
-
-      {/* Favorite Team Dossiers */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {favoriteTeams.map((team) => {
-          const outlook = getTeamSeasonOutlook(team);
-          return (
-            <div
-              key={team.id}
-              className="rounded-2xl border border-border/70 bg-card/70 p-4 transition hover:border-primary/50 space-y-3 cursor-pointer"
-              onClick={() => onSelectTeam(team.id)}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <Seal t={team} size={40} />
-                  <div>
-                    <h3 className="font-display text-sm font-bold">
-                      {lang === "th" ? team.th : team.name}
-                    </h3>
-                    <span className="text-xs text-muted-foreground">
-                      {team.league} • {team.record}
-                    </span>
-                  </div>
-                </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleFav(team.id);
-                  }}
-                  className="p-1 text-amber-400 hover:text-muted-foreground cursor-pointer"
-                >
-                  <Star className="h-4 w-4 fill-amber-400" />
-                </button>
-              </div>
-
-              <p className="text-xs text-muted-foreground line-clamp-2">
-                {outlook.summary[lang]}
-              </p>
-
-              <div className="flex items-center justify-between border-t border-border/40 pt-2 text-xs">
-                <span className="font-mono text-primary font-bold">
-                  {outlook.phaseLabel[lang]}
-                </span>
-                <span className="text-muted-foreground">Details →</span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Matches for Favorite Teams */}
-      {favoriteGames.length > 0 && (
-        <section className="space-y-3">
-          <h3 className="font-display text-sm font-bold tracking-wider text-muted-foreground uppercase">
-            {lang === "th" ? "ตารางแข่งของทีมโปรด" : "FAVORITE TEAM FIXTURES"}
-          </h3>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {favoriteGames.map((game) => (
-              <GameCard
-                key={game.id}
-                game={game}
-                lang={lang}
-                isFav={true}
-                toggleFav={() => toggleFav(game.home)}
-                onSelect={() => onSelectGame(game)}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-    </div>
-  );
-}
-// =========================================================================
-// TAB: EXPLORE (SEARCH & CATALOGUE)
-// =========================================================================
-
-function ExploreTab({
-  lang,
-  favs,
-  toggleFav,
-  onAddAllMN,
-  onSelectTeam,
-}: {
-  lang: Lang;
-  favs: string[];
-  toggleFav: (id: string) => void;
-  onAddAllMN: () => void;
-  onSelectTeam: (id: string) => void;
-}) {
-  const [query, setQuery] = useState("");
-
-  const filtered = useMemo(() => {
-    const q = query.toLowerCase().trim();
-    if (!q) return TEAMS;
-    return TEAMS.filter(
-      (t) =>
-        t.name.toLowerCase().includes(q) ||
-        t.th.toLowerCase().includes(q) ||
-        t.seal.toLowerCase().includes(q) ||
-        t.league.toLowerCase().includes(q)
-    );
-  }, [query]);
-
-  return (
-    <div className="space-y-6">
-      {/* Search Bar */}
-      <div className="relative">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={lang === "th" ? "ค้นหาทุกทีม (EN / ภาษาไทย)..." : "Search any team (Vikings, Dragons, Arsenal)..."}
-          className="w-full rounded-2xl border border-border bg-card/80 py-3.5 pl-12 pr-4 text-sm font-medium placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-sm"
-        />
-      </div>
-
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span>Showing {filtered.length} teams across all sports</span>
-        <button
-          onClick={onAddAllMN}
-          className="font-bold text-primary hover:underline cursor-pointer"
-        >
-          ★ Add All 7 MN Teams
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {filtered.map((team) => {
-          const isFav = favs.includes(team.id);
-
-          return (
-            <div
-              key={team.id}
-              onClick={() => onSelectTeam(team.id)}
-              className="flex items-center justify-between rounded-2xl border border-border/70 bg-card/60 p-3.5 transition hover:border-primary/50 cursor-pointer"
-            >
-              <div className="flex items-center gap-3">
-                <Seal t={team} size={36} />
-                <div>
-                  <h4 className="font-display text-sm font-bold">
-                    {lang === "th" ? team.th : team.name}
-                  </h4>
-                  <span className="text-[11px] text-muted-foreground">
-                    {team.league} • {team.record}
-                  </span>
-                </div>
-              </div>
-
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleFav(team.id);
-                }}
-                className="p-1.5 text-muted-foreground hover:text-amber-400 cursor-pointer"
-              >
-                <Star
-                  className={`h-4 w-4 ${isFav ? "fill-amber-400 text-amber-400" : ""}`}
-                />
-              </button>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// =========================================================================
-// TAB: LEAGUES (MULTI-SPORT DASHBOARD)
-// =========================================================================
-
-function LeaguesTab({
-  games,
-  lang,
-  onSelectLeague,
-}: {
-  games: Game[];
-  lang: Lang;
-  onSelectLeague: () => void;
-}) {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="font-display text-2xl font-bold tracking-tight">
-          {lang === "th" ? "ศูนย์กลางการแข่งขันทุกทุกลีก" : "GLOBAL LEAGUES HUB"}
-        </h2>
-        <p className="text-xs text-muted-foreground">
-          Real-time scoreboards monitored across 11 premier domestic and global sports leagues.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {LEAGUES.map((l) => {
-          const leagueGames = games.filter((g) => g.league === l.key);
-
-          return (
-            <div
-              key={l.key}
-              onClick={onSelectLeague}
-              className="group rounded-2xl border border-border bg-card/70 p-5 transition hover:border-primary/50 cursor-pointer"
-            >
-              <div className="flex items-center justify-between">
-                <span className="rounded-lg bg-primary/20 px-2 py-0.5 text-xs font-bold text-primary uppercase">
-                  {l.sport}
-                </span>
-                <span className="text-xs text-muted-foreground font-mono">
-                  {leagueGames.length} games
-                </span>
-              </div>
-
-              <h3 className="mt-3 font-display text-xl font-bold group-hover:text-primary transition">
-                {l.name}
-              </h3>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Public scoreboard endpoint connected via ESPN & Hermetica API.
-              </p>
-
-              <div className="mt-4 flex items-center justify-between border-t border-border/40 pt-3 text-xs font-semibold text-primary">
-                <span>View Matches</span>
-                <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// =========================================================================
-// TAB: FANTASY & PICKS
-// =========================================================================
-
-function FantasyTab({
-  lang,
-  favs,
-  games,
-  preds,
-  setPreds,
-}: {
-  lang: Lang;
-  favs: string[];
-  games: Game[];
-  preds: Record<string, string>;
-  setPreds: (p: Record<string, string>) => void;
-}) {
-  const predictionCount = Object.keys(preds).length;
-
-  return (
-    <div className="space-y-6">
-      <div className="rounded-3xl border border-primary/30 bg-gradient-to-r from-primary/10 via-card/60 to-card/90 p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <span className="rounded-full bg-primary/20 px-3 py-1 text-xs font-bold text-primary">
-              PREDICTION ENGINE
-            </span>
-            <h2 className="mt-2 font-display text-2xl font-bold">
-              {lang === "th" ? "ทายผลและสะสมแต้มแฟนตาซี" : "Sports OS Game Predictor"}
-            </h2>
-            <p className="text-xs text-muted-foreground mt-1">
-              Select winners for active slates. Earn 10 PTS for each correct prediction.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-secondary/80 px-4 py-2 text-center">
-              <span className="text-[10px] text-muted-foreground uppercase font-bold block">
-                TOTAL PTS
-              </span>
-              <span className="font-mono text-2xl font-bold text-primary">
-                {predictionCount * 10} PTS
-              </span>
-            </div>
-            <div className="rounded-xl bg-secondary/80 px-4 py-2 text-center">
-              <span className="text-[10px] text-muted-foreground uppercase font-bold block">
-                ACTIVE PICKS
-              </span>
-              <span className="font-mono text-2xl font-bold text-accent">
-                {predictionCount}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {games.slice(0, 8).map((game) => {
-          const home = teamById(game.home);
-          const away = teamById(game.away);
-          const currentPick = preds[game.id];
-
-          return (
-            <div
-              key={game.id}
-              className="rounded-2xl border border-border bg-card/70 p-4 space-y-3"
-            >
-              <div className="flex items-center justify-between text-xs text-muted-foreground font-semibold">
-                <span>{game.league}</span>
-                <span>{fmtTime(game.kickoff, "Asia/Bangkok", lang)}</span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => setPreds({ ...preds, [game.id]: away.id })}
-                  className={`flex flex-col items-center justify-center rounded-xl border p-3 transition cursor-pointer ${
-                    currentPick === away.id
-                      ? "border-primary bg-primary/20 text-foreground font-bold shadow-sm"
-                      : "border-border bg-card hover:bg-secondary text-muted-foreground"
-                  }`}
-                >
-                  <Seal t={away} size={36} />
-                  <span className="mt-2 text-xs font-bold">{away.name}</span>
-                </button>
-
-                <button
-                  onClick={() => setPreds({ ...preds, [game.id]: home.id })}
-                  className={`flex flex-col items-center justify-center rounded-xl border p-3 transition cursor-pointer ${
-                    currentPick === home.id
-                      ? "border-primary bg-primary/20 text-foreground font-bold shadow-sm"
-                      : "border-border bg-card hover:bg-secondary text-muted-foreground"
-                  }`}
-                >
-                  <Seal t={home} size={36} />
-                  <span className="mt-2 text-xs font-bold">{home.name}</span>
-                </button>
-              </div>
-
-              {currentPick && (
-                <div className="flex items-center justify-between border-t border-border/40 pt-2 text-xs font-semibold text-accent">
-                  <span>Picked: {teamById(currentPick).name}</span>
-                  <CheckCircle2 className="h-4 w-4" />
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// =========================================================================
-// GAME CARD (MATCHUP ROW)
-// =========================================================================
-
-export function GameCard({
-  game,
-  lang,
-  isFav,
-  toggleFav,
-  pred,
-  setPred,
-  onSelect,
-}: {
-  game: Game;
-  lang: Lang;
-  isFav: boolean;
-  toggleFav: () => void;
-  pred?: string | undefined;
-  setPred?: ((teamId: string) => void) | undefined;
-  onSelect?: (() => void) | undefined;
-}) {
-  const home = teamById(game.home);
-  const away = teamById(game.away);
-  const isLive = game.status === "LIVE";
-  const isFinal = game.status === "FINAL";
-
-  return (
-    <div
-      onClick={onSelect}
-      className={`relative overflow-hidden rounded-3xl border p-5 transition shadow-sm hover:shadow-md cursor-pointer ${
-        isLive
-          ? "border-red-500/40 bg-gradient-to-b from-red-500/5 via-card to-card"
-          : isFinal
-          ? "border-emerald-500/30 bg-gradient-to-b from-emerald-500/5 via-card to-card hover:border-emerald-500/50"
-          : "border-border/80 bg-card/70 hover:border-primary/50"
-      }`}
-    >
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <div className="flex items-center gap-2">
-          <span className="rounded-lg bg-secondary px-2 py-0.5 font-bold uppercase text-[10px]">
-            {game.league}
-          </span>
-          {isLive ? (
-            <span className="flex items-center gap-1 font-bold text-red-500 animate-pulse">
-              <span className="h-2 w-2 rounded-full bg-red-500" />
-              {game.clock}
-            </span>
-          ) : isFinal ? (
-            <span className="rounded-md bg-emerald-500/15 px-2 py-0.5 font-mono text-[10px] font-bold text-emerald-400 border border-emerald-500/30">
-              FINAL
-            </span>
-          ) : (
-            <span className="font-mono">
-              {fmtTime(game.kickoff, "Asia/Bangkok", lang)}
-            </span>
-          )}
-        </div>
-
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleFav();
-          }}
-          className="p-1 text-muted-foreground hover:text-amber-400 cursor-pointer"
-        >
-          <Star
-            className={`h-4 w-4 ${isFav ? "fill-amber-400 text-amber-400" : ""}`}
-          />
-        </button>
-      </div>
-
-      {/* Matchup Grid */}
-      <div className="mt-4 grid grid-cols-2 gap-4">
-        {/* Away Team */}
-        <div className="flex items-center gap-3">
-          <Seal t={away} size={42} />
-          <div>
-            <h4 className="font-display text-sm font-bold leading-tight">
-              {lang === "th" ? away.th : away.name}
-            </h4>
-            <span className="text-[11px] text-muted-foreground">{away.record}</span>
-          </div>
-          {(isLive || isFinal) && (
-            <span className={`ml-auto font-mono text-2xl font-black ${isFinal ? "text-foreground" : ""}`}>
-              {game.as}
-            </span>
-          )}
-        </div>
-
-        {/* Home Team */}
-        <div className="flex items-center gap-3">
-          <Seal t={home} size={42} />
-          <div>
-            <h4 className="font-display text-sm font-bold leading-tight">
-              {lang === "th" ? home.th : home.name}
-            </h4>
-            <span className="text-[11px] text-muted-foreground">{home.record}</span>
-          </div>
-          {(isLive || isFinal) && (
-            <span className={`ml-auto font-mono text-2xl font-black ${isFinal ? "text-foreground" : ""}`}>
-              {game.hs}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Footer Info: Venue & Odds */}
-      <div className="mt-4 flex items-center justify-between border-t border-border/40 pt-3 text-xs text-muted-foreground">
-        <div className="flex items-center gap-1 truncate max-w-[65%]">
-          <MapPin className="h-3.5 w-3.5 shrink-0" />
-          <span className="truncate">{game.venue || "Stadium Arena"}</span>
-        </div>
-        <div className="font-mono text-foreground font-semibold">
-          {game.odds || "—"}
-        </div>
       </div>
     </div>
   );
