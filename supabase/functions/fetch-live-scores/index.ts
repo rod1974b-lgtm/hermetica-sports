@@ -83,8 +83,6 @@ function generateFinalPulseParagraph(
   newPulse: number,
   league: string
 ): { en: string; th: string } {
-  const diff = Math.abs(myScore - oppScore);
-
   if (isWinner) {
     return {
       en: `${teamName} secured a commanding ${myScore}-${oppScore} victory against ${oppName}. Their composite rating surges to ${newPulse.toFixed(
@@ -249,7 +247,6 @@ serve(async (req) => {
             ];
 
             for (const t of teamsToProcess) {
-              // Deterministic ratings derived from box score and game context
               const baseRating = t.won ? 75 : 48;
               const marginBoost = Math.min(15, Math.abs(t.myS - t.oppS) * 1.5);
               
