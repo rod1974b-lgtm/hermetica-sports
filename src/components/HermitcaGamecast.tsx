@@ -326,7 +326,7 @@ export function HermitcaGamecast({
                     <Tv className="w-2.5 h-2.5" /> NBA League Pass
                   </span>
                   <span className="cursor-pointer px-2 py-0.5 rounded bg-white/10 text-white/80 text-[10px] font-mono">
-                    SUN OCT 25 Q4:14.1
+                    {currentGame.clock || currentGame.status}
                   </span>
                 </>
               ) : currentSport === "nfl" ? (
@@ -335,7 +335,7 @@ export function HermitcaGamecast({
                     ESPN Gamecast
                   </span>
                   <span className="cursor-pointer px-2 py-0.5 rounded bg-white/10 text-white/80 text-[10px] font-mono">
-                    KC 24 @ SEA 27
+                    {awayTeam.seal || currentGame.away.slice(0, 3).toUpperCase()} {currentGame.as} @ {homeTeam.seal || currentGame.home.slice(0, 3).toUpperCase()} {currentGame.hs}
                   </span>
                 </>
               ) : (
@@ -351,57 +351,93 @@ export function HermitcaGamecast({
             </div>
           </div>
 
-          {/* Big Score Header */}
+          {/* Big Score Header - DYNAMIC LIVE SCORES & TEAMS */}
           <div className="grid grid-cols-1 md:grid-cols-3 items-center gap-6 bg-[#071816]/70 p-5 rounded-2xl border border-white/10 backdrop-blur-md">
             {/* Away Team */}
             <div className="flex items-center justify-start md:justify-end gap-4 cursor-pointer hover:opacity-90 transition">
               <div className="text-left md:text-right">
                 <div className="text-sm md:text-base font-bold text-white flex items-center gap-2 md:justify-end">
-                  <span>{currentSport === "mlb" ? "Pittsburgh Pirates" : currentSport === "nfl" ? "Kansas City Chiefs" : currentSport === "nba" ? "Orlando Magic" : awayTeam.name}</span>
+                  <span>{awayTeam.name || currentGame.away}</span>
                 </div>
                 <div className="text-xs text-white/50 font-mono">
-                  {currentSport === "mlb" ? "76-86 • NL Central" : currentSport === "nfl" ? "11-3 • AFC West" : currentSport === "nba" ? "47-35 • 5th East" : awayTeam.record}
+                  {awayTeam.record || (currentGame.status === "FINAL" ? "FINAL" : currentGame.clock || "")}
                 </div>
               </div>
-              <div
-                className="w-14 h-14 rounded-2xl flex items-center justify-center font-bold text-lg text-white shadow-xl border border-white/20"
-                style={{ backgroundColor: currentSport === "nfl" ? "#E31837" : currentSport === "nba" ? "#0077C0" : awayTeam.color }}
-              >
-                {currentSport === "mlb" ? "PIT" : currentSport === "nfl" ? "KC" : currentSport === "nba" ? "ORL" : awayTeam.seal}
-              </div>
+              {awayTeam.logo ? (
+                <img
+                  src={awayTeam.logo}
+                  alt={awayTeam.name}
+                  className="w-14 h-14 object-contain rounded-2xl p-1.5 bg-black/40 border border-white/20 shadow-xl"
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
+              ) : (
+                <div
+                  className="w-14 h-14 rounded-2xl flex items-center justify-center font-bold text-lg text-white shadow-xl border border-white/20"
+                  style={{ backgroundColor: awayTeam.color || "#1E293B" }}
+                >
+                  {awayTeam.seal || currentGame.away.slice(0, 3).toUpperCase()}
+                </div>
+              )}
               <div className="text-3xl md:text-4xl font-black font-mono tracking-tight text-white/95">
-                {currentSport === "mlb" ? 2 : currentSport === "nfl" ? 24 : currentSport === "nba" ? 109 : currentGame.as}
+                {currentGame.as ?? 0}
               </div>
             </div>
 
             {/* Center Status / Clock / Situational Pill */}
             <div className="flex flex-col items-center justify-center text-center px-2 py-1">
-              <div className="text-xs font-mono font-bold text-[#00FF88] px-3 py-1 rounded-full bg-[#00FF88]/10 border border-[#00FF88]/30 mb-1 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-[#00FF88] animate-pulse" />
-                {currentGame.clock} • {currentSport === "nfl" ? "1st & 10 at KC 20" : currentSport === "mlb" ? "Balls 3 • Strikes 2 • Outs 2" : "ACTIVE PLAY"}
+              <div
+                className={`text-xs font-mono font-bold px-3 py-1 rounded-full border mb-1 flex items-center gap-1.5 ${
+                  currentGame.status === "LIVE"
+                    ? "text-[#00FF88] bg-[#00FF88]/10 border-[#00FF88]/30"
+                    : currentGame.status === "FINAL"
+                    ? "text-amber-300 bg-amber-400/10 border-amber-400/30"
+                    : "text-white/80 bg-white/5 border-white/15"
+                }`}
+              >
+                {currentGame.status === "LIVE" && (
+                  <span className="w-2 h-2 rounded-full bg-[#00FF88] animate-pulse" />
+                )}
+                <span>
+                  {currentGame.status === "FINAL"
+                    ? (lang === "th" ? "จบการแข่งขัน • FINAL" : "FINAL")
+                    : `${currentGame.clock || currentGame.status}`}
+                </span>
               </div>
               <div className="text-[11px] text-white/40 font-mono">
-                {currentGame.odds}
+                {currentGame.odds || (lang === "th" ? "อัตราต่อรองสด" : "Live Gamecast")}
               </div>
             </div>
 
             {/* Home Team */}
             <div className="flex items-center justify-end md:justify-start gap-4 cursor-pointer hover:opacity-90 transition">
               <div className="text-3xl md:text-4xl font-black font-mono tracking-tight text-[#00FF88]">
-                {currentSport === "mlb" ? 4 : currentSport === "nfl" ? 27 : currentSport === "nba" ? 100 : currentGame.hs}
+                {currentGame.hs ?? 0}
               </div>
-              <div
-                className="w-14 h-14 rounded-2xl flex items-center justify-center font-bold text-lg text-white shadow-xl border border-white/20"
-                style={{ backgroundColor: currentSport === "nfl" ? "#002244" : currentSport === "nba" ? "#006BB6" : currentSport === "soccer" ? "#FF6600" : homeTeam.color }}
-              >
-                {currentSport === "mlb" ? "CIN" : currentSport === "nfl" ? "SEA" : currentSport === "nba" ? "NYK" : homeTeam.seal}
-              </div>
+              {homeTeam.logo ? (
+                <img
+                  src={homeTeam.logo}
+                  alt={homeTeam.name}
+                  className="w-14 h-14 object-contain rounded-2xl p-1.5 bg-black/40 border border-white/20 shadow-xl"
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
+              ) : (
+                <div
+                  className="w-14 h-14 rounded-2xl flex items-center justify-center font-bold text-lg text-white shadow-xl border border-white/20"
+                  style={{ backgroundColor: homeTeam.color || "#0F766E" }}
+                >
+                  {homeTeam.seal || currentGame.home.slice(0, 3).toUpperCase()}
+                </div>
+              )}
               <div className="text-left">
                 <div className="text-sm md:text-base font-bold text-white flex items-center gap-2">
-                  <span>{currentSport === "mlb" ? "Cincinnati Reds" : currentSport === "nfl" ? "Seattle Seahawks" : currentSport === "nba" ? "New York Knicks" : homeTeam.name}</span>
+                  <span>{homeTeam.name || currentGame.home}</span>
                 </div>
                 <div className="text-xs text-white/50 font-mono">
-                  {currentSport === "mlb" ? "82-80 • NL Central" : currentSport === "nfl" ? "10-4 • NFC West" : currentSport === "nba" ? "50-32 • 2nd East" : homeTeam.record}
+                  {homeTeam.record || (currentGame.status === "FINAL" ? "FINAL" : currentGame.clock || "")}
                 </div>
               </div>
             </div>
@@ -454,7 +490,7 @@ export function HermitcaGamecast({
             }`}
           >
             <TrendingUp className="w-3.5 h-3.5" />
-            <span>{lang === "th" ? "โมเดลโอกาสชนะ" : "Win Probability"}</span>
+            <span>{lang === "th" ? "โอกาสชนะสด" : "Win Probability"}</span>
           </button>
         </div>
       </nav>
@@ -556,7 +592,6 @@ export function HermitcaGamecast({
     </div>
   );
 }
-
 /* =========================================================================
  * 1. MLB GAMEDAY + ESPN LAYER COMPONENT
  * ========================================================================= */
@@ -1038,7 +1073,6 @@ function NFLVisualizer({
     </div>
   );
 }
-
 /* =========================================================================
  * 3. NBA / WNBA 365SCORES COURT + NBA.COM LAYER
  * ========================================================================= */
@@ -1406,338 +1440,6 @@ function SoccerVisualizer({
             <span className="text-white/70">Sub: Ratchaburi brings on fresh striker</span>
           </div>
         </div>
-      </div>
-    </div>
-  );
-}
-
-/* =========================================================================
- * 5. UNIVERSAL MATCHUP PREDICTOR DONUT (ALL SPORTS)
- * ========================================================================= */
-function MatchupPredictorDonut({
-  currentSport,
-  lang,
-  onShare,
-}: {
-  currentSport: SportMode;
-  lang: Lang;
-  onShare: (msg: string) => void;
-}) {
-  const pHome = currentSport === "soccer" ? 48.2 : 54.3;
-  const pAway = currentSport === "soccer" ? 51.8 : 45.7;
-
-  const radius = 54;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffsetHome = circumference - (pHome / 100) * circumference;
-
-  return (
-    <div className="bg-[#0D2421] rounded-2xl p-5 border border-white/10 shadow-xl space-y-4">
-      <div className="flex items-center justify-between pb-2 border-b border-white/10">
-        <div>
-          <div className="text-[10px] font-mono text-[#00FF88] uppercase tracking-wider font-bold">
-            MATCHUP PREDICTOR
-          </div>
-          <div className="text-xs text-white/60">
-            ESPN Analytics • Hermitca Engine
-          </div>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => onShare("Link copied for X / LINE Share!")}
-            className="cursor-pointer px-2 py-1 rounded bg-white/5 hover:bg-white/15 text-[11px] font-mono text-white/80 border border-white/10 transition"
-          >
-            X / LINE
-          </button>
-          <button
-            onClick={() => onShare("Opening Facebook Match Share...")}
-            className="cursor-pointer px-2 py-1 rounded bg-blue-600/30 hover:bg-blue-600/50 text-[11px] font-mono text-blue-200 border border-blue-500/40 transition"
-          >
-            FB
-          </button>
-        </div>
-      </div>
-
-      {/* DONUT SVG WITH STRIPES & TEAL */}
-      <div className="flex flex-col items-center justify-center py-2 relative">
-        <svg viewBox="0 0 160 160" className="w-44 h-44">
-          <defs>
-            <pattern id="donut-stripes" width="8" height="8" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
-              <line x1="0" y1="0" x2="0" y2="8" stroke="#FF4D6D" strokeWidth="4" />
-              <line x1="4" y1="0" x2="4" y2="8" stroke="#1A2D29" strokeWidth="4" />
-            </pattern>
-          </defs>
-
-          {/* Background Ring */}
-          <circle
-            cx="80"
-            cy="80"
-            r={radius}
-            fill="none"
-            stroke="url(#donut-stripes)"
-            strokeWidth="16"
-          />
-
-          {/* Active Home Ring (Teal / Neon) */}
-          <circle
-            cx="80"
-            cy="80"
-            r={radius}
-            fill="none"
-            stroke="#00FF88"
-            strokeWidth="16"
-            strokeDasharray={circumference}
-            strokeDashoffset={strokeDashoffsetHome}
-            strokeLinecap="round"
-            transform="rotate(-90 80 80)"
-            className="transition-all duration-1000 ease-out"
-          />
-
-          {/* Center Text */}
-          <text x="80" y="72" fill="#FFFFFF" fontSize="18" fontWeight="900" textAnchor="middle" fontFamily="monospace">
-            {pHome}%
-          </text>
-          <text x="80" y="90" fill="#00FF88" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="sans-serif">
-            WIN CHANCE
-          </text>
-          <text x="80" y="104" fill="#FFFFFF" opacity="0.4" fontSize="8" textAnchor="middle">
-            VS {pAway}%
-          </text>
-        </svg>
-
-        {/* Legend */}
-        <div className="flex items-center justify-between w-full px-4 text-xs font-mono mt-1">
-          <div className="flex items-center gap-1.5 text-red-300">
-            <span className="w-3 h-3 rounded-full bg-red-500/80 border border-white/20" />
-            <span>AWAY: {pAway}%</span>
-          </div>
-          <div className="flex items-center gap-1.5 text-[#00FF88]">
-            <span className="w-3 h-3 rounded-full bg-[#00FF88] border border-black/40" />
-            <span>HOME: {pHome}%</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="text-[10px] text-white/40 text-center font-mono pt-1 border-t border-white/5">
-        Calculated using live play pacing, EPA per snap, and historical weather indices.
-      </div>
-    </div>
-  );
-}
-
-/* =========================================================================
- * 6. SIDE SCOREBOARD FEED LIST (365SCORES STYLE)
- * ========================================================================= */
-function SideScoreboardList({
-  activeSport,
-  onSelectDemo,
-  lang,
-}: {
-  activeSport: SportMode;
-  onSelectDemo: (k: string) => void;
-  lang: Lang;
-}) {
-  return (
-    <div className="bg-[#0D2421] rounded-2xl p-4 border border-white/10 space-y-3">
-      <div className="text-xs font-mono font-bold text-white/50 uppercase tracking-wider flex items-center justify-between">
-        <span>365Scores Live Match Feed</span>
-        <span className="w-2 h-2 rounded-full bg-[#00FF88] animate-pulse" />
-      </div>
-
-      <div className="space-y-2">
-        {/* Brooklyn Nets @ Indiana Pacers */}
-        <div
-          onClick={() => onSelectDemo("nba")}
-          className="cursor-pointer p-2.5 rounded-xl bg-black/30 hover:bg-[#00FF88]/10 border border-white/5 hover:border-[#00FF88]/30 transition"
-        >
-          <div className="flex justify-between items-center text-[10px] font-mono text-white/40 mb-1">
-            <span>NBA • FINAL</span>
-            <span className="text-amber-300 font-bold">136-109</span>
-          </div>
-          <div className="flex justify-between text-xs font-semibold text-white">
-            <span>Brooklyn Nets</span>
-            <span className="text-white/60">109</span>
-          </div>
-          <div className="flex justify-between text-xs font-semibold text-[#00FF88]">
-            <span>Indiana Pacers</span>
-            <span>136</span>
-          </div>
-        </div>
-
-        {/* Orlando Magic @ New York Knicks */}
-        <div
-          onClick={() => onSelectDemo("nba")}
-          className="cursor-pointer p-2.5 rounded-xl bg-black/30 hover:bg-[#00FF88]/10 border border-white/5 hover:border-[#00FF88]/30 transition"
-        >
-          <div className="flex justify-between items-center text-[10px] font-mono text-white/40 mb-1">
-            <span className="text-red-400 font-bold">LIVE Q4 0:14</span>
-            <span className="text-[#00FF88] font-bold">109-100</span>
-          </div>
-          <div className="flex justify-between text-xs font-semibold text-[#00FF88]">
-            <span>Orlando Magic</span>
-            <span>109</span>
-          </div>
-          <div className="flex justify-between text-xs font-semibold text-white">
-            <span>New York Knicks</span>
-            <span className="text-white/60">100</span>
-          </div>
-        </div>
-
-        {/* Kansas City @ Seattle */}
-        <div
-          onClick={() => onSelectDemo("nfl")}
-          className="cursor-pointer p-2.5 rounded-xl bg-black/30 hover:bg-[#00FF88]/10 border border-white/5 hover:border-[#00FF88]/30 transition"
-        >
-          <div className="flex justify-between items-center text-[10px] font-mono text-white/40 mb-1">
-            <span className="text-red-400 font-bold">LIVE Q4 3:12</span>
-            <span className="text-[#00FF88] font-bold">24-27</span>
-          </div>
-          <div className="flex justify-between text-xs font-semibold text-white">
-            <span>Kansas City Chiefs</span>
-            <span className="text-white/60">24</span>
-          </div>
-          <div className="flex justify-between text-xs font-semibold text-[#00FF88]">
-            <span>Seattle Seahawks</span>
-            <span>27</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* =========================================================================
- * 7. PLAY-BY-PLAY PANEL
- * ========================================================================= */
-function PlayByPlayPanel({ sport, lang }: { sport: SportMode; lang: Lang }) {
-  return (
-    <div className="bg-[#0D2421] rounded-2xl p-5 border border-white/10 space-y-3">
-      <div className="text-xs font-mono font-bold text-[#00FF88] uppercase">
-        {lang === "th" ? "ลำดับเหตุการณ์เพลย์ล่าสุด" : "Detailed Play Log"}
-      </div>
-      <div className="space-y-2 text-xs">
-        <div className="p-3 bg-black/40 rounded-xl border border-white/5 flex items-start gap-3 cursor-pointer hover:bg-white/5 transition">
-          <span className="font-mono text-[#00FF88] font-bold whitespace-nowrap">3:12 Q4</span>
-          <div>
-            <div className="font-bold text-white">33-yd Pass completion from S. Darnold to J. Smith-Njigba</div>
-            <div className="text-white/50 text-[11px]">Tackled at KC 20 • First Down SEA • +4.8% Win Prob</div>
-          </div>
-        </div>
-        <div className="p-3 bg-black/40 rounded-xl border border-white/5 flex items-start gap-3 cursor-pointer hover:bg-white/5 transition">
-          <span className="font-mono text-white/50 whitespace-nowrap">3:48 Q4</span>
-          <div>
-            <div className="font-bold text-white">K. Walker III rush right tackle for 4 yards</div>
-            <div className="text-white/50 text-[11px]">Ball on SEA 47 • Tackle by C. Jones</div>
-          </div>
-        </div>
-        <div className="p-3 bg-black/40 rounded-xl border border-white/5 flex items-start gap-3 cursor-pointer hover:bg-white/5 transition">
-          <span className="font-mono text-white/50 whitespace-nowrap">4:25 Q4</span>
-          <div>
-            <div className="font-bold text-white">S. Darnold pass short left to N. Fant for 12 yards</div>
-            <div className="text-white/50 text-[11px]">First Down SEA • Out of bounds stops clock</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* =========================================================================
- * 8. BOX SCORE & STATS PANEL
- * ========================================================================= */
-function StatsPanel({ sport, lang }: { sport: SportMode; lang: Lang }) {
-  return (
-    <div className="bg-[#0D2421] rounded-2xl p-5 border border-white/10 space-y-4">
-      <div className="text-xs font-mono font-bold text-[#00FF88] uppercase">
-        {lang === "th" ? "การเปรียบเทียบสถิติเชิงลึก" : "Head-to-Head Advanced Analytics"}
-      </div>
-      <div className="space-y-3 text-xs font-mono">
-        <div>
-          <div className="flex justify-between mb-1">
-            <span className="text-white/60">Total Yards / Offense</span>
-            <span className="text-[#00FF88] font-bold">384 vs 326</span>
-          </div>
-          <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden flex">
-            <div style={{ width: "54%" }} className="h-full bg-[#00FF88]" />
-            <div style={{ width: "46%" }} className="h-full bg-red-500" />
-          </div>
-        </div>
-        <div>
-          <div className="flex justify-between mb-1">
-            <span className="text-white/60">Third Down Efficiency</span>
-            <span className="text-[#00FF88] font-bold">7/12 (58%) vs 4/11 (36%)</span>
-          </div>
-          <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden flex">
-            <div style={{ width: "62%" }} className="h-full bg-[#00FF88]" />
-            <div style={{ width: "38%" }} className="h-full bg-red-500" />
-          </div>
-        </div>
-        <div>
-          <div className="flex justify-between mb-1">
-            <span className="text-white/60">Time of Possession</span>
-            <span className="text-[#00FF88] font-bold">32:15 vs 24:33</span>
-          </div>
-          <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden flex">
-            <div style={{ width: "57%" }} className="h-full bg-[#00FF88]" />
-            <div style={{ width: "43%" }} className="h-full bg-red-500" />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* =========================================================================
- * 9. WIN PROBABILITY PANEL
- * ========================================================================= */
-function WinProbPanel({ sport, lang }: { sport: SportMode; lang: Lang }) {
-  return (
-    <div className="bg-[#0D2421] rounded-2xl p-5 border border-white/10 space-y-4">
-      <div className="flex justify-between items-center">
-        <div className="text-xs font-mono font-bold text-[#00FF88] uppercase">
-          WIN PROBABILITY LINE CHART (Q1 - Q4)
-        </div>
-        <div className="text-xs font-mono text-white/60">
-          Red Dotted (Chiefs) vs Blue Solid (Seahawks)
-        </div>
-      </div>
-
-      <div className="w-full h-36 bg-[#071714] p-3 rounded-xl border border-white/10">
-        <svg viewBox="0 0 500 120" className="w-full h-full">
-          {/* 50% equilibrium line */}
-          <line x1="0" y1="60" x2="500" y2="60" stroke="#FFF" strokeWidth="1" strokeDasharray="3 3" opacity="0.3" />
-
-          {/* Quarters grid lines */}
-          <line x1="125" y1="0" x2="125" y2="120" stroke="#FFF" strokeWidth="0.5" opacity="0.1" />
-          <line x1="250" y1="0" x2="250" y2="120" stroke="#FFF" strokeWidth="0.5" opacity="0.1" />
-          <line x1="375" y1="0" x2="375" y2="120" stroke="#FFF" strokeWidth="0.5" opacity="0.1" />
-
-          <text x="60" y="115" fill="#FFF" opacity="0.3" fontSize="9">Q1</text>
-          <text x="185" y="115" fill="#FFF" opacity="0.3" fontSize="9">Q2</text>
-          <text x="310" y="115" fill="#FFF" opacity="0.3" fontSize="9">Q3</text>
-          <text x="435" y="115" fill="#FFF" opacity="0.3" fontSize="9">Q4</text>
-
-          {/* Away Team (Red Dotted) */}
-          <polyline
-            points="0,60 80,45 150,70 230,85 300,50 380,68 450,55 500,48"
-            fill="none"
-            stroke="#FF3366"
-            strokeWidth="2.5"
-            strokeDasharray="4 3"
-          />
-
-          {/* Home Team (Blue/Neon Solid) */}
-          <polyline
-            points="0,60 80,75 150,50 230,35 300,70 380,52 450,65 500,72"
-            fill="none"
-            stroke="#00FF88"
-            strokeWidth="3"
-          />
-        </svg>
-      </div>
-
-      <div className="flex justify-between text-xs font-mono text-white/70">
-        <span className="text-red-400">Chiefs Equity: 45.7%</span>
-        <span className="text-[#00FF88] font-bold">Seahawks Equity: 54.3%</span>
       </div>
     </div>
   );
