@@ -313,7 +313,7 @@ export default function HermeticaSportsApp() {
     try {
       const leagueKeys = Object.keys(ESPN_LEAGUES);
       const results = await Promise.allSettled(
-        leagueKeys.map((k) => fetchLiveESPNLeague(k, ESPN_LEAGUES[k]))
+        Object.entries(ESPN_LEAGUES).map(([k, endpoint]) => fetchLiveESPNLeague(k, endpoint))
       );
       const all: Game[] = [];
       for (const r of results) {
