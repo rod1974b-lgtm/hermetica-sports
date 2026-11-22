@@ -355,16 +355,15 @@ const HUB_SCHEDULE_QUERIES = [
  * Any match marked UPCOMING whose start time passed over 20 minutes ago is expired.
  */
 export function isGameExpired(g: Game, nowMs: number = Date.now()): boolean {
-  if (g.status === "LIVE") return false;
+  if (g.status === "LIVE" || g.status === "FINAL") return false;
   const kickoffMs = new Date(g.kickoff).getTime();
   if (isNaN(kickoffMs)) return true;
-  // If kickoff was in the past and status is not LIVE, it is expired
   return kickoffMs < nowMs - 20 * 60 * 1000;
 }
 
 /**
  * Fetches real-time games for a given league.
- * Strictly excludes past/finished games so ONLY active LIVE and scheduled UPCOMING games display.
+ * Retains LIVE in-progress games, completed FINAL games with scores, and UPCOMING fixtures.
  */
 export async function fetchLiveESPNLeague(leagueKey: string, endpointKey: string): Promise<Game[]> {
   try {
@@ -381,7 +380,14 @@ export async function fetchLiveESPNLeague(leagueKey: string, endpointKey: string
     if (!data) {
       try {
         const res = await fetch(
-          `https://site.api.espn.com/apis/site/v2/sports/${endpointKey}/scoreboard`
+          `https://site.api.espn.com/apis/site/v2/sports/${endpointKey}/scoreboard`,
+          {
+            headers: {
+              "User-Agent":
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+              Accept: "application/json",
+            },
+          }
         );
         if (res.ok) {
           data = await res.json();
@@ -408,11 +414,13 @@ export async function fetchLiveESPNLeague(leagueKey: string, endpointKey: string
         const statusState = ev.status?.type?.state; // 'pre' | 'in' | 'post'
         const isCompleted = ev.status?.type?.completed === true;
 
-        // Strictly omit finished games
-        if (statusState === "post" || isCompleted) return null;
-
         const kickoffMs = new Date(ev.date).getTime();
-        const status: "LIVE" | "UPCOMING" = statusState === "in" ? "LIVE" : "UPCOMING";
+        const status: "LIVE" | "UPCOMING" | "FINAL" =
+          statusState === "in"
+            ? "LIVE"
+            : statusState === "post" || isCompleted
+            ? "FINAL"
+            : "UPCOMING";
 
         // Exclude UPCOMING games whose start time has already passed
         if (status === "UPCOMING" && kickoffMs < nowMs - 20 * 60 * 1000) {
@@ -422,13 +430,15 @@ export async function fetchLiveESPNLeague(leagueKey: string, endpointKey: string
         const clock =
           status === "LIVE"
             ? ev.status?.displayClock || `${ev.status?.period || 1}Q`
+            : status === "FINAL"
+            ? ev.status?.type?.shortDetail || "Final"
             : new Date(ev.date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
         const hs = parseInt(home?.score || "0", 10);
         const as = parseInt(away?.score || "0", 10);
 
         const stats =
-          status === "LIVE"
+          status === "LIVE" || status === "FINAL"
             ? {
                 possession: 50,
                 shotsH: hs,
